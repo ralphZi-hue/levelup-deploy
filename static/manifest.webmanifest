@@ -1,6 +1,6 @@
 {
-  "name": "FamBank",
-  "short_name": "FamBank",
+  "name": "Level",
+  "short_name": "Level",
   "description": "Taschengeld, Aufgaben und Lernen für die Familie",
   "start_url": "/",
   "display": "standalone",

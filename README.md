@@ -1,6 +1,8 @@
-# FamBank 🏦
+# Level 🏆
 
 Familien-App für **Taschengeld, Aufgaben, Verhalten und Lernen** – für Ralph, Anja, Julian und Vincent.
+
+> Code-intern und im Ordner (`Apps/FamBank/`) heißt das Projekt weiterhin „FamBank" – die App selbst heißt jetzt **Level**.
 
 Eltern (Admin) stellen Regeln auf und bestätigen Buchungen; die Kinder sehen ein
 Dashboard mit ihrer **voraussichtlichen nächsten Taschengeld-Auszahlung**.

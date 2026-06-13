@@ -22,7 +22,7 @@ from auth import authenticate, session_secret
 from db import BASE_DIR, child_balance, db, get_setting, init_db
 from seed import seed
 
-app = FastAPI(title="FamBank")
+app = FastAPI(title="Level")
 app.add_middleware(SessionMiddleware, secret_key=session_secret(), max_age=60 * 60 * 24 * 14)
 app.mount("/static", StaticFiles(directory=os.path.join(BASE_DIR, "static")), name="static")
 

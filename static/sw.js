@@ -1,6 +1,6 @@
-// FamBank Service Worker – minimaler App-Shell-Cache (Phase 1).
+// Level Service Worker – minimaler App-Shell-Cache (Phase 1).
 // Bewusst schlank: Netzwerk-zuerst, Cache nur als Fallback für statische Assets.
-const CACHE = 'fambank-v3';
+const CACHE = 'fambank-v4';
 const ASSETS = ['/static/style.css', '/static/geo.js', '/static/gamify.js', '/static/icon.svg', '/static/manifest.webmanifest'];
 
 self.addEventListener('install', (e) => {
