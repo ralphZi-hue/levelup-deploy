@@ -137,6 +137,19 @@ CREATE TABLE IF NOT EXISTS test_answers (
     is_correct  INTEGER NOT NULL DEFAULT 0
 );
 
+CREATE TABLE IF NOT EXISTS invites (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    token         TEXT    NOT NULL UNIQUE,
+    email         TEXT    NOT NULL,
+    name          TEXT    NOT NULL,
+    username      TEXT    NOT NULL UNIQUE,
+    role          TEXT    NOT NULL CHECK (role IN ('admin','child')),
+    base_allowance INTEGER NOT NULL DEFAULT 0,
+    created_by    INTEGER NOT NULL REFERENCES users(id),
+    created_at    TEXT    NOT NULL DEFAULT (datetime('now')),
+    used_at       TEXT
+);
+
 CREATE INDEX IF NOT EXISTS idx_tx_child  ON transactions(child_id);
 CREATE INDEX IF NOT EXISTS idx_tx_status ON transactions(status);
 CREATE INDEX IF NOT EXISTS idx_ev_tx     ON evidence(tx_id);
@@ -144,12 +157,14 @@ CREATE INDEX IF NOT EXISTS idx_deck_child ON decks(child_id);
 CREATE INDEX IF NOT EXISTS idx_card_deck  ON cards(deck_id);
 CREATE INDEX IF NOT EXISTS idx_ts_child   ON test_sessions(child_id);
 CREATE INDEX IF NOT EXISTS idx_ta_session ON test_answers(session_id);
+CREATE INDEX IF NOT EXISTS idx_invite_token ON invites(token);
 """
 
 
 MIGRATIONS = [
     # (table, column, ddl)
     ("users", "cash_legacy", "ALTER TABLE users ADD COLUMN cash_legacy INTEGER NOT NULL DEFAULT 0"),
+    ("users", "email", "ALTER TABLE users ADD COLUMN email TEXT"),
 ]
 
 
