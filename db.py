@@ -293,6 +293,16 @@ def pocket_balance(conn: sqlite3.Connection, child_id: int) -> int:
     ).fetchone()["s"]
 
 
+def pocket_txs(conn: sqlite3.Connection, child_id: int, limit: int = 10) -> list:
+    """Letzte Taschengeldkonto-Buchungen."""
+    return conn.execute(
+        "SELECT pt.*, u.name AS by_name FROM pocket_transactions pt "
+        "LEFT JOIN users u ON u.id = pt.created_by "
+        "WHERE pt.child_id = ? ORDER BY pt.created_at DESC LIMIT ?",
+        (child_id, limit),
+    ).fetchall()
+
+
 def get_setting(conn: sqlite3.Connection, key: str, default: str = "") -> str:
     row = conn.execute("SELECT value FROM settings WHERE key = ?", (key,)).fetchone()
     return row["value"] if row else default
