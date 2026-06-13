@@ -35,7 +35,8 @@ Dann im Browser: <http://localhost:8770>
 - **Phase 2:** Foto-Beweise (Live-Kamera, Server-Zeitstempel, Geodaten/EXIF) ✅
 - **Phase 3a:** Leitner-Karteikasten + freies Üben ✅
 - **Phase 3b:** Verifizierter Test (Eltern schalten frei, Prüfungsmodus) → Gutschrift bei Bestehen ✅
-- **Phase 4 (nächste):** Auszahlungs-Zyklen, Passwort-Self-Service, Hosting (Domain + HTTPS)
+- **Phase 4 (nächste):** Auszahlungs-Zyklen, Passwort-Self-Service, Hosting (Domain + HTTPS) ✅
+- **Phase 5:** Aufgaben (Assignments) – Hausaufgaben/Projekte/Haushalt mit Frist + Belohnung/Abzug ✅
 
 ### Phase 4 – Detailplanung (Stand 2026-06-13)
 
@@ -90,6 +91,24 @@ Antworten im **Prüfungsmodus** mit Countdown ein; die Lösungen liegen **nie im
 server-seitig in `learn.check_answer`) – Schutz gegen Schummeln per KI oder Quelltext. Ab der
 Trefferquote (Standard 80 %) gibt es automatisch eine Gutschrift, markiert als „✅ verifiziert".
 
+### Aufgaben (Assignments)
+Eltern können unter `/admin/tasks` Aufgaben mit Frist und Belohnung/Abzug an ein Kind vergeben
+(z.B. Hausaufgaben, Projekte, Haushaltsaufgaben) – Titel, Kategorie, Betrag ± (€-Eingabe wie beim
+Regelwerk), optionale Frist (Datum), optionale Notiz, optionale Beweisfoto-Pflicht (pro Aufgabe
+einstellbar). Das Kind sieht offene Aufgaben unter "📝 Meine Aufgaben" auf `/me`, sortiert nach
+Frist; überfällige Aufgaben (Frist verstrichen, Status noch "offen") werden mit ⚠️ markiert – es
+passiert dabei **nichts automatisch**, Eltern entscheiden manuell.
+
+Workflow: Kind klickt "Erledigt ✅" → `/tasks/{id}/complete` (optional mit Foto-Beweis, wie beim
+Regelwerk-Antrag) → erzeugt eine `pending`-Buchung in `transactions` und setzt
+`assignments.status='pending'`. Eltern bestätigen/lehnen wie gewohnt über die normale
+"Wartet auf Bestätigung"-Queue im Admin-Bereich (`/admin/tx/{id}/decide`):
+- **Bestätigt** → Buchung wird gültig (Saldo ändert sich), `assignments.status='approved'`
+- **Abgelehnt** → Buchung bleibt ungültig, `assignments.status` springt zurück auf `'open'`
+  (Kind kann die Aufgabe erneut als erledigt melden)
+
+Admins können offene (noch nicht erledigte) Aufgaben unter `/admin/tasks` wieder löschen.
+
 ### Benutzerverwaltung & Einladungen
 Unter `/admin/users` können Admins neue Benutzer (Kind oder Admin) per E-Mail einladen. Admin gibt
 Name, Benutzername, E-Mail, Rolle und (bei Kindern) Grund-Taschengeld vor; der Versand erfolgt per
@@ -110,6 +129,8 @@ kryptografische Garantie – das wäre nur mit einer nativen App + Hardware-Atte
 - `evidence` – Beweisfotos zu Buchungen (Datei, Server-/Geräte-Zeit, Geo, EXIF)
 - `decks` / `cards` – Karteikästen pro Kind & Fach + Leitner-Karten (Fach 1–5, Fälligkeit)
 - `test_sessions` / `test_answers` – verifizierte Tests (Status, Belohnung, Trefferquote, Ergebnisse)
+- `assignments` – Aufgaben mit Frist & Betrag ± pro Kind, Status `open`/`pending`/`approved`/`rejected`,
+  verknüpft mit `transactions` über `tx_id`
 - `settings` – Konfiguration (z.B. Auszahlungstag)
 
 Beweisfotos liegen unter `data/uploads/` (gitignored) und werden nur über die geschützte
