@@ -822,6 +822,7 @@ def add_rule(
     is_surprise: str = Form("0"),
     max_uses: str = Form(""),
     period: str = Form(""),
+    conditions: str = Form(""),
 ):
     with db() as conn:
         user = current_user(request, conn)
@@ -838,7 +839,7 @@ def add_rule(
             max_uses_int = None
         conn.execute(
             "INSERT INTO rules(title, category, amount, requires_proof, "
-            "amount_mode, is_surprise, max_uses, period) VALUES(?,?,?,?,?,?,?,?)",
+            "amount_mode, is_surprise, max_uses, period, conditions) VALUES(?,?,?,?,?,?,?,?,?)",
             (
                 title.strip(), category, cents,
                 1 if requires_proof == "1" else 0,
@@ -846,6 +847,7 @@ def add_rule(
                 1 if is_surprise == "1" else 0,
                 max_uses_int,
                 period if period in ("day", "week", "month") else None,
+                conditions.strip() or None,
             ),
         )
     flash(request, "Regel hinzugefügt. ✅")

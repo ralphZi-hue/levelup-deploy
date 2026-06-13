@@ -186,18 +186,44 @@
         {% set uses = rule_uses.get(r.id, 0) %}
         {% set remaining = (r.max_uses - uses) if r.max_uses else None %}
         {% set exhausted = remaining is not none and remaining <= 0 %}
-        <a href="{{ '/claim/new?rule_id=' ~ r.id if not exhausted else '#' }}"
-           class="rule-card {{ 'plus' if r.amount >= 0 else 'minus' }} {{ 'exhausted' if exhausted }}">
-          <div class="rule-title">{{ r.title }}</div>
-          <div class="rule-amount">{{ r.amount|euro }}</div>
-          {% if r.requires_proof %}<div class="rule-proof">📷 Foto nötig</div>{% endif %}
-          {% if remaining is not none %}
-          <div class="rule-proof {{ 'exhausted-label' if exhausted }}">
-            {{ 'Limit erreicht' if exhausted else 'Noch ' ~ remaining ~ '× möglich' }}
+        <div class="rule-card {{ 'plus' if r.amount >= 0 else 'minus' }} {{ 'exhausted' if exhausted }}"
+             id="rc-{{ r.id }}"
+             onclick="{{ 'flipRuleDetail(' ~ r.id ~ ', event)' if not exhausted else '' }}">
+
+          {# Vorderseite #}
+          <div class="rule-face" id="rf-{{ r.id }}">
+            <div class="rule-title">{{ r.title }}</div>
+            <div class="rule-amount">{{ r.amount|euro }}</div>
+            {% if r.requires_proof %}<div class="rule-proof">📷 Foto nötig</div>{% endif %}
+            {% if remaining is not none %}
+            <div class="rule-proof {{ 'exhausted-label' if exhausted }}">
+              {{ 'Limit erreicht' if exhausted else 'Noch ' ~ remaining ~ '× möglich' }}
+            </div>
+            {% endif %}
+            {% if not exhausted %}
+            <span class="rule-go">{{ 'Bedingungen →' if r.conditions else 'Eintragen →' }}</span>
+            {% endif %}
           </div>
-          {% endif %}
-          {% if not exhausted %}<span class="rule-go">Eintragen →</span>{% endif %}
-        </a>
+
+          {# Rückseite #}
+          <div class="rule-back-face" id="rb-{{ r.id }}">
+            <div class="rule-title">{{ r.title }}</div>
+            <div class="rule-amount {{ 'plus' if r.amount >= 0 else 'minus' }}">{{ r.amount|euro }}</div>
+            {% if r.conditions %}
+            <div class="rule-conditions">{{ r.conditions }}</div>
+            {% else %}
+            <div class="rule-conditions rule-cond-empty">Keine besonderen Bedingungen.</div>
+            {% endif %}
+            {% if r.requires_proof %}<div class="rule-proof">📷 Beweisfoto nötig</div>{% endif %}
+            {% if not exhausted %}
+            <a class="btn btn-ok rule-claim-btn" href="/claim/new?rule_id={{ r.id }}"
+               onclick="event.stopPropagation()">Eintragen →</a>
+            {% endif %}
+            <button class="btn btn-small rule-back-btn"
+              onclick="flipRuleBack({{ r.id }}, event)">← Zurück</button>
+          </div>
+
+        </div>
       {% endfor %}
     </div>
   </div>

@@ -42,6 +42,36 @@ document.addEventListener('DOMContentLoaded', function () {
   if (admin) _startDinnerCountdown('adminDinnerCountdown', admin.dataset.time);
 });
 
+/* ---- Rule detail flip ---- */
+const _flippedRules = new Set();
+
+function flipRuleDetail(ruleId, event) {
+  if (_flippedRules.has(ruleId)) return;
+  const card = document.getElementById('rc-' + ruleId);
+  if (!card) return;
+  card.classList.add('card-flipping');
+  setTimeout(function () {
+    document.getElementById('rf-' + ruleId).style.display = 'none';
+    const back = document.getElementById('rb-' + ruleId);
+    back.style.display = 'flex';
+    _flippedRules.add(ruleId);
+    card.classList.remove('card-flipping');
+  }, 200);
+}
+
+function flipRuleBack(ruleId, event) {
+  event.stopPropagation();
+  const card = document.getElementById('rc-' + ruleId);
+  if (!card) return;
+  card.classList.add('card-flipping');
+  setTimeout(function () {
+    document.getElementById('rb-' + ruleId).style.display = 'none';
+    document.getElementById('rf-' + ruleId).style.display = 'flex';
+    _flippedRules.delete(ruleId);
+    card.classList.remove('card-flipping');
+  }, 200);
+}
+
 /* ---- Surprise card ---- */
 const _surTimers = {};
 

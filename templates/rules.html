@@ -36,7 +36,7 @@
         <option value="1">ja ❓</option>
       </select>
     </label>
-    <label>Max. Nutzungen <input name="max_uses" placeholder="z.B. 3 (leer = unbegrenzt)" style=""></label>
+    <label>Max. Nutzungen <input name="max_uses" placeholder="z.B. 3 (leer = unbegrenzt)"></label>
     <label>Pro Zeitraum
       <select name="period">
         <option value="">— unbegrenzt —</option>
@@ -44,6 +44,10 @@
         <option value="week">pro Woche</option>
         <option value="month">pro Monat</option>
       </select>
+    </label>
+    <label class="wide">Bedingungen / Details
+      <textarea name="conditions" rows="2"
+        placeholder="Was muss erfüllt sein? Ausnahmen? Wann gilt die Regel?"></textarea>
     </label>
     <button type="submit" class="wide">Hinzufügen</button>
   </form>

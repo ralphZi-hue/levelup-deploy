@@ -411,6 +411,28 @@ body.role-child .rule-card:active { transform: scale(.97); }
 .rule-card.exhausted { opacity: .45; pointer-events: none; }
 .exhausted-label { color: var(--minus) !important; }
 
+/* ---- Flip-Karten (Regeldetails) ---- */
+.rule-card { cursor: pointer; transition: transform .2s ease, opacity .2s ease; }
+.rule-card.card-flipping { transform: scaleX(0); opacity: .15; }
+
+.rule-face {
+  display: flex; flex-direction: column; gap: 8px; height: 100%;
+}
+.rule-back-face {
+  display: none; flex-direction: column; gap: 8px; height: 100%;
+}
+.rule-conditions {
+  font-size: 13px; color: var(--ink); line-height: 1.5;
+  flex: 1; overflow-y: auto; max-height: 90px;
+  background: #f8f9ff; border-radius: 8px; padding: 8px 10px;
+}
+.rule-cond-empty { color: var(--muted); font-style: italic; }
+.rule-claim-btn { margin-top: auto; padding: 9px; text-align: center; }
+.rule-back-btn {
+  padding: 6px 10px; font-size: 12px; background: #eef0f8;
+  color: var(--muted); margin-top: 4px;
+}
+
 /* ====================================================================== */
 /* Surprise Cards                                                          */
 /* ====================================================================== */
