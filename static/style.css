@@ -59,6 +59,29 @@ button:active { transform: scale(.98); }
 .btn-small { padding: 6px 10px; font-size: 13px; background: #eef0f8; color: var(--ink); }
 .btn-ok { background: var(--plus); }
 .btn-no { background: #eef0f8; color: var(--minus); }
+.btn {
+  display: inline-block; text-decoration: none; font: inherit; font-weight: 600;
+  cursor: pointer; border: none; background: var(--brand); color: #fff;
+  padding: 11px 16px; border-radius: 12px; transition: background .15s, transform .05s;
+}
+.btn:hover { background: var(--brand-d); }
+.btn:active { transform: scale(.98); }
+.btn.btn-small { padding: 6px 10px; font-size: 13px; background: #eef0f8; color: var(--ink); }
+
+/* ---- Aufgaben ---- */
+.task-list { background: var(--card); border-radius: 14px; box-shadow: var(--shadow); overflow: hidden; }
+.task-row { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center;
+  gap: 8px 14px; padding: 13px 16px; border-bottom: 1px solid var(--line); }
+.task-row:last-child { border-bottom: none; }
+.task-row.overdue { background: #fdecec; }
+.task-row.pending { background: #fffdf3; }
+.task-main { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 140px; }
+.task-title { font-weight: 600; font-size: 15px; }
+.task-note { font-size: 13px; color: var(--muted); }
+.task-deadline { font-size: 12px; color: var(--muted); }
+.task-row.overdue .task-deadline { color: var(--minus); font-weight: 600; }
+.task-amount { font-weight: 800; font-size: 16px; }
+.task-status { font-size: 13px; color: var(--muted); }
 
 label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 12px; font-weight: 600; }
 input, select, textarea {

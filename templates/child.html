@@ -52,6 +52,30 @@
 <p class="hint">Du siehst nur Level und Trend – nicht den genauen Kontostand der anderen. 🤫</p>
 {% endif %}
 
+{% if tasks %}
+<h2>📝 Meine Aufgaben</h2>
+<div class="task-list">
+  {% for t in tasks %}
+    {% set overdue = t.deadline and t.deadline < today and t.status == 'open' %}
+    <div class="task-row {{ 'overdue' if overdue else '' }} {{ 'pending' if t.status == 'pending' else '' }}">
+      <div class="task-main">
+        <span class="task-title">{{ t.title }}</span>
+        {% if t.note %}<span class="task-note">{{ t.note }}</span>{% endif %}
+        {% if t.deadline %}
+          <span class="task-deadline">{{ '⚠️ überfällig: ' if overdue else 'Frist: ' }}{{ t.deadline }}</span>
+        {% endif %}
+      </div>
+      <div class="task-amount {{ 'plus' if t.amount >= 0 else 'minus' }}">{{ t.amount|euro }}</div>
+      {% if t.status == 'pending' %}
+        <span class="task-status">⏳ wartet auf Bestätigung</span>
+      {% else %}
+        <a class="btn btn-small" href="/tasks/{{ t.id }}/complete">Erledigt ✅</a>
+      {% endif %}
+    </div>
+  {% endfor %}
+</div>
+{% endif %}
+
 <h2>Was möchtest du eintragen?</h2>
 <p class="hint">Such dir aus, was du gemacht hast. Mama oder Papa bestätigen es dann.</p>
 

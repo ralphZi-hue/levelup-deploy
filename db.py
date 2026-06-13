@@ -177,6 +177,8 @@ CREATE INDEX IF NOT EXISTS idx_card_deck  ON cards(deck_id);
 CREATE INDEX IF NOT EXISTS idx_ts_child   ON test_sessions(child_id);
 CREATE INDEX IF NOT EXISTS idx_ta_session ON test_answers(session_id);
 CREATE INDEX IF NOT EXISTS idx_invite_token ON invites(token);
+CREATE INDEX IF NOT EXISTS idx_assign_child  ON assignments(child_id);
+CREATE INDEX IF NOT EXISTS idx_assign_status ON assignments(status);
 """
 
 

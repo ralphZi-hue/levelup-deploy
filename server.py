@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import os
 import secrets
+from datetime import date
 from typing import Optional
 
 from fastapi import FastAPI, File, Form, Request, UploadFile
@@ -199,6 +200,11 @@ def child_dashboard(request: Request):
         rules = conn.execute(
             "SELECT * FROM rules WHERE active = 1 ORDER BY category, amount DESC"
         ).fetchall()
+        tasks = conn.execute(
+            "SELECT * FROM assignments WHERE child_id = ? AND status IN ('open','pending') "
+            "ORDER BY (deadline IS NULL), deadline ASC, id ASC",
+            (user["id"],),
+        ).fetchall()
         payout_day = get_setting(conn, "payout_day", "1")
 
         level = gamify.level_info(_xp(conn, user["id"]))
@@ -215,7 +221,8 @@ def child_dashboard(request: Request):
         request, "child.html",
         {
             "request": request, "user": user, "balance": balance,
-            "recent": recent, "pending": pending, "rules": rules,
+            "recent": recent, "pending": pending, "rules": rules, "tasks": tasks,
+            "today": date.today().isoformat(),
             "payout_day": payout_day, "flash": pop_flash(request),
             "level": level, "week": week, "week_trend": _trend(week), "siblings": siblings,
         },
@@ -278,6 +285,68 @@ def submit_claim(
     return RedirectResponse("/me", status_code=303)
 
 
+@app.get("/tasks/{task_id}/complete", response_class=HTMLResponse)
+def task_complete_new(request: Request, task_id: int):
+    with db() as conn:
+        user = current_user(request, conn)
+        if not user or user["role"] != "child":
+            return RedirectResponse("/", status_code=303)
+        task = conn.execute(
+            "SELECT * FROM assignments WHERE id = ? AND child_id = ? AND status = 'open'",
+            (task_id, user["id"]),
+        ).fetchone()
+    if not task:
+        flash(request, "Aufgabe nicht gefunden.", "err")
+        return RedirectResponse("/me", status_code=303)
+    return templates.TemplateResponse(
+        request, "task_complete.html", {"request": request, "user": user, "task": task}
+    )
+
+
+@app.post("/tasks/{task_id}/complete")
+def task_complete_submit(
+    request: Request,
+    task_id: int,
+    note: str = Form(""),
+    photo: Optional[UploadFile] = File(None),
+    lat: str = Form(""),
+    lon: str = Form(""),
+    accuracy: str = Form(""),
+    client_time: str = Form(""),
+):
+    with db() as conn:
+        user = current_user(request, conn)
+        if not user or user["role"] != "child":
+            return RedirectResponse("/", status_code=303)
+        task = conn.execute(
+            "SELECT * FROM assignments WHERE id = ? AND child_id = ? AND status = 'open'",
+            (task_id, user["id"]),
+        ).fetchone()
+        if not task:
+            flash(request, "Aufgabe nicht gefunden.", "err")
+            return RedirectResponse("/me", status_code=303)
+        has_photo = bool(photo and photo.filename)
+        if task["requires_proof"] and not has_photo:
+            flash(request, "Für diese Aufgabe ist ein Beweisfoto nötig. 📷", "err")
+            return RedirectResponse(f"/tasks/{task_id}/complete", status_code=303)
+        cur = conn.execute(
+            "INSERT INTO transactions(child_id, title, amount, status, note, created_by) "
+            "VALUES(?,?,?,'pending',?,?)",
+            (user["id"], task["title"], task["amount"], note.strip(), user["id"]),
+        )
+        try:
+            attach_evidence(conn, cur.lastrowid, user["id"], photo, lat, lon, accuracy, client_time)
+        except ev.UploadError as e:
+            flash(request, f"Foto-Problem: {e}", "err")
+            return RedirectResponse(f"/tasks/{task_id}/complete", status_code=303)
+        conn.execute(
+            "UPDATE assignments SET status = 'pending', tx_id = ?, completed_at = datetime('now') WHERE id = ?",
+            (cur.lastrowid, task_id),
+        )
+    flash(request, "Als erledigt markiert – wartet auf Bestätigung durch Mama/Papa. ✅")
+    return RedirectResponse("/me", status_code=303)
+
+
 # ---------------------------------------------------------------------------
 # Admin-Bereich
 # ---------------------------------------------------------------------------
@@ -323,6 +392,14 @@ def decide_tx(request: Request, tx_id: int, action: str = Form(...)):
             "UPDATE transactions SET status = ?, decided_by = ?, decided_at = datetime('now') "
             "WHERE id = ? AND status = 'pending'",
             (status, user["id"], tx_id),
+        )
+        # Hängt eine Aufgabe an dieser Buchung? Bei Bestätigung -> erledigt,
+        # bei Ablehnung -> zurück auf "offen" (Kind kann es erneut versuchen).
+        assign_status = "approved" if action == "approve" else "open"
+        conn.execute(
+            "UPDATE assignments SET status = ?, decided_by = ?, decided_at = datetime('now') "
+            "WHERE tx_id = ? AND status = 'pending'",
+            (assign_status, user["id"], tx_id),
         )
     flash(request, "Bestätigt. ✅" if action == "approve" else "Abgelehnt.")
     return RedirectResponse("/admin", status_code=303)
@@ -518,6 +595,79 @@ def toggle_rule(request: Request, rule_id: int):
             return RedirectResponse("/", status_code=303)
         conn.execute("UPDATE rules SET active = 1 - active WHERE id = ?", (rule_id,))
     return RedirectResponse("/admin/rules", status_code=303)
+
+
+# ---------------------------------------------------------------------------
+# Aufgaben (Assignments)
+# ---------------------------------------------------------------------------
+
+@app.get("/admin/tasks", response_class=HTMLResponse)
+def admin_tasks(request: Request):
+    with db() as conn:
+        user = current_user(request, conn)
+        if not user or user["role"] != "admin":
+            return RedirectResponse("/", status_code=303)
+        children = conn.execute(
+            "SELECT * FROM users WHERE role = 'child' ORDER BY name"
+        ).fetchall()
+        assignments = conn.execute(
+            "SELECT a.*, u.name AS child_name, "
+            "(SELECT e.id FROM evidence e WHERE e.tx_id = a.tx_id LIMIT 1) AS evidence_id "
+            "FROM assignments a JOIN users u ON u.id = a.child_id "
+            "ORDER BY CASE a.status WHEN 'open' THEN 0 WHEN 'pending' THEN 1 ELSE 2 END, "
+            "(a.deadline IS NULL), a.deadline, a.id DESC"
+        ).fetchall()
+    return templates.TemplateResponse(
+        request, "admin_tasks.html",
+        {
+            "request": request, "user": user, "children": children,
+            "assignments": assignments, "today": date.today().isoformat(),
+            "flash": pop_flash(request),
+        },
+    )
+
+
+@app.post("/admin/tasks/add")
+def add_task(
+    request: Request,
+    child_id: int = Form(...),
+    title: str = Form(...),
+    category: str = Form(...),
+    amount: str = Form(...),
+    deadline: str = Form(""),
+    requires_proof: str = Form("0"),
+    note: str = Form(""),
+):
+    with db() as conn:
+        user = current_user(request, conn)
+        if not user or user["role"] != "admin":
+            return RedirectResponse("/", status_code=303)
+        try:
+            cents = int(round(float(amount.replace(",", ".")) * 100))
+        except ValueError:
+            flash(request, "Betrag ungültig (z.B. 0,50 oder -1).", "err")
+            return RedirectResponse("/admin/tasks", status_code=303)
+        conn.execute(
+            "INSERT INTO assignments(child_id, title, category, amount, deadline, requires_proof, note, created_by) "
+            "VALUES(?,?,?,?,?,?,?,?)",
+            (
+                child_id, title.strip(), category, cents, deadline.strip() or None,
+                1 if requires_proof == "1" else 0, note.strip() or None, user["id"],
+            ),
+        )
+    flash(request, "Aufgabe erstellt. ✅")
+    return RedirectResponse("/admin/tasks", status_code=303)
+
+
+@app.post("/admin/tasks/{task_id}/delete")
+def delete_task(request: Request, task_id: int):
+    with db() as conn:
+        user = current_user(request, conn)
+        if not user or user["role"] != "admin":
+            return RedirectResponse("/", status_code=303)
+        conn.execute("DELETE FROM assignments WHERE id = ? AND status = 'open'", (task_id,))
+    flash(request, "Aufgabe gelöscht.")
+    return RedirectResponse("/admin/tasks", status_code=303)
 
 
 # ---------------------------------------------------------------------------
