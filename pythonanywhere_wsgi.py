@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from a2wsgi import ASGIMiddleware
 
-from server import app as _asgi_app
+from server import app as _asgi_app, _startup
 
 # ASGIMiddleware startet einen Hintergrund-Thread mit eigenem Event-Loop.
 # uWSGI laedt dieses Modul im Master-Prozess und forkt danach die Worker --
@@ -26,5 +26,8 @@ _application: ASGIMiddleware | None = None
 def application(environ, start_response):
     global _application
     if _application is None:
+        # a2wsgi loest das ASGI-Lifespan-Protokoll (startup/shutdown) nicht aus,
+        # daher hier manuell aufrufen -- sonst fehlen Tabellen (init_db) und Seed-User.
+        _startup()
         _application = ASGIMiddleware(_asgi_app)
     return _application(environ, start_response)
