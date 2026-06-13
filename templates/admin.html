@@ -24,6 +24,7 @@
             <span class="a-child">{{ t.child_name }}</span>
             <span class="a-title">{{ t.title }}</span>
             {% if t.note %}<span class="a-note">„{{ t.note }}"</span>{% endif %}
+            {% if t.evidence_id %}<a class="a-evidence" href="/evidence/{{ t.evidence_id }}">📷 Beweis ansehen</a>{% endif %}
           </div>
           <div class="a-amount {{ 'plus' if t.amount >= 0 else 'minus' }}">{{ t.amount|euro }}</div>
           <form method="post" action="/admin/tx/{{ t.id }}/decide" class="a-actions">
@@ -40,8 +41,10 @@
 
 <section class="panel">
   <h2>Direkt buchen</h2>
-  <p class="hint">Sofort gültig – z.B. ein Vergehen erfassen oder eine Belohnung gutschreiben.</p>
-  <form method="post" action="/admin/book" class="book-form">
+  <p class="hint">Sofort gültig – z.B. ein Vergehen erfassen oder eine Belohnung gutschreiben. Optional mit Beweisfoto + Standort.</p>
+  <form method="post" action="/admin/book" enctype="multipart/form-data" data-geo class="book-form">
+    <input type="hidden" name="lat"><input type="hidden" name="lon">
+    <input type="hidden" name="accuracy"><input type="hidden" name="client_time">
     <label>Kind
       <select name="child_id" required>
         {% for k in kids %}<option value="{{ k.row.id }}">{{ k.row.name }}</option>{% endfor %}
@@ -58,8 +61,15 @@
     <label>Eigener Titel <input name="custom_title" placeholder="z.B. Handtuch liegen gelassen"></label>
     <label>Betrag € <input name="custom_amount" placeholder="z.B. -1,50 oder 2"></label>
     <label class="wide">Notiz <input name="note" placeholder="optional"></label>
+    <label class="wide">Beweisfoto (optional)
+      <input type="file" name="photo" accept="image/*" capture="environment" data-preview>
+    </label>
+    <img id="photo-preview" alt="Vorschau" style="display:none">
+    <div id="geo-status" class="geo-status wide"></div>
     <button type="submit">Buchen</button>
   </form>
 </section>
+
+<script src="/static/geo.js"></script>
 
 {% endblock %}

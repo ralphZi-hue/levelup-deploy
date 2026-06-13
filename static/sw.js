@@ -1,7 +1,7 @@
 // FamBank Service Worker – minimaler App-Shell-Cache (Phase 1).
 // Bewusst schlank: Netzwerk-zuerst, Cache nur als Fallback für statische Assets.
-const CACHE = 'fambank-v1';
-const ASSETS = ['/static/style.css', '/static/icon.svg', '/static/manifest.webmanifest'];
+const CACHE = 'fambank-v2';
+const ASSETS = ['/static/style.css', '/static/geo.js', '/static/icon.svg', '/static/manifest.webmanifest'];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(ASSETS)));
