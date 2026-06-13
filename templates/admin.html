@@ -9,14 +9,32 @@
     <div class="kid-card">
       <div class="kid-name">{{ k.row.name }}</div>
       <div class="kid-balance {{ 'neg' if k.balance < 0 else '' }}">{{ k.balance|euro }}</div>
-      <div class="kid-sub">voraussichtliche Auszahlung</div>
-      <form method="post" action="/admin/payout" style="margin-top:10px;">
-        <input type="hidden" name="child_id" value="{{ k.row.id }}">
-        <button class="btn btn-small" type="submit"
-          onclick="return confirm('Auszahlung für {{ k.row.name }} erfassen und Saldo auf 0 setzen?');">
-          💸 Auszahlung
-        </button>
-      </form>
+      <div class="kid-sub">App-Saldo</div>
+      <button class="btn btn-small" style="margin-top:10px;"
+        onclick="openPayoutModal({{ k.row.id }})">💸 Auszahlung</button>
+
+      <div style="margin-top:10px;font-size:13px;font-weight:600;">
+        💰 TG-Konto: <span class="{{ 'plus' if k.pocket > 0 else '' }}">{{ k.pocket|euro }}</span>
+      </div>
+      <details style="margin-top:6px;text-align:left;">
+        <summary class="kid-sub" style="cursor:pointer;">Einzahlen / Abheben</summary>
+        <form method="post" action="/admin/pocket/book" style="margin-top:8px;">
+          <input type="hidden" name="child_id" value="{{ k.row.id }}">
+          <div style="display:flex;gap:6px;margin-bottom:6px;">
+            <select name="type" style="flex:1;margin-top:0;padding:8px 10px;font-size:13px;">
+              <option value="deposit">Einzahlung</option>
+              <option value="withdrawal">Abhebung</option>
+            </select>
+            <input type="text" name="amount" placeholder="z.B. 5,00"
+              style="width:90px;margin-top:0;padding:8px 10px;font-size:13px;"
+              data-1p-ignore data-lpignore="true" autocomplete="off">
+          </div>
+          <input type="text" name="note" placeholder="Notiz (optional)"
+            style="margin-bottom:6px;font-size:13px;">
+          <button class="btn btn-small" type="submit" style="width:100%;">Buchen</button>
+        </form>
+      </details>
+
       <details style="margin-top:8px;">
         <summary class="kid-sub" style="cursor:pointer;">Bargeld-Altbestand: {{ k.row.cash_legacy|euro }}</summary>
         <form method="post" action="/admin/cash_legacy" style="margin-top:6px;display:flex;gap:6px;">
@@ -30,6 +48,87 @@
     </div>
   {% endfor %}
 </div>
+
+<!-- ===== Auszahlungs-Dialoge (einer pro Kind) ===== -->
+{% for k in kids %}
+<dialog id="payout-modal-{{ k.row.id }}" class="payout-dialog">
+  <h3 style="margin-top:0;">Auszahlung · {{ k.row.name }}</h3>
+  <p class="payout-total {{ 'payout-neg' if k.balance <= 0 else '' }}">{{ k.balance|euro }}</p>
+
+  {% if k.balance > 0 %}
+  <div class="payout-methods">
+    <label class="payout-opt">
+      <input type="radio" name="m{{ k.row.id }}" value="bank" checked
+        onchange="switchMethod({{ k.row.id }}, 'bank')">
+      🏦 Banküberweisung
+    </label>
+    <label class="payout-opt">
+      <input type="radio" name="m{{ k.row.id }}" value="pocket"
+        onchange="switchMethod({{ k.row.id }}, 'pocket')">
+      💰 Taschengeldkonto
+    </label>
+  </div>
+
+  <!-- Bank-Bereich -->
+  <div id="bank-sec-{{ k.row.id }}" class="payout-sec">
+    <div class="copy-row">
+      <span class="copy-label">Betrag</span>
+      <strong>{{ k.balance|euro }}</strong>
+      <button type="button" class="btn btn-small copy-btn"
+        onclick="copyText('{{ '%.2f'|format(k.balance/100)|replace('.', ',') }}')">Kopieren</button>
+    </div>
+    <div class="copy-row">
+      <span class="copy-label">IBAN</span>
+      <input id="iban-{{ k.row.id }}" class="copy-input" type="text"
+        value="{{ k.row.iban or '' }}" placeholder="DE12 3456 7890 …">
+      <button type="button" class="btn btn-small copy-btn"
+        onclick="copyEl('iban-{{ k.row.id }}')">Kopieren</button>
+    </div>
+    <div class="copy-row">
+      <span class="copy-label">Verwendungszweck</span>
+      <input id="zweck-{{ k.row.id }}" class="copy-input" type="text"
+        value="Taschengeld {{ current_month }} – {{ k.row.name }}">
+      <button type="button" class="btn btn-small copy-btn"
+        onclick="copyEl('zweck-{{ k.row.id }}')">Kopieren</button>
+    </div>
+  </div>
+
+  <!-- Taschengeldkonto-Bereich -->
+  <div id="pocket-sec-{{ k.row.id }}" class="payout-sec" hidden>
+    <p style="font-size:14px;color:var(--muted);margin:0;">
+      {{ k.balance|euro }} werden auf das Taschengeldkonto von <strong>{{ k.row.name }}</strong>
+      gebucht. Der App-Saldo wird auf 0 gesetzt.
+    </p>
+    <p style="font-size:13px;color:var(--muted);margin:6px 0 0;">
+      Aktueller TG-Konto-Stand: {{ k.pocket|euro }}
+      → danach: {{ (k.pocket + k.balance)|euro }}
+    </p>
+  </div>
+
+  <form method="post" action="/admin/payout" id="payout-form-{{ k.row.id }}">
+    <input type="hidden" name="child_id" value="{{ k.row.id }}">
+    <input type="hidden" name="method" id="method-{{ k.row.id }}" value="bank">
+    <input type="hidden" name="iban" id="iban-h-{{ k.row.id }}">
+    <input type="hidden" name="verwendungszweck" id="zweck-h-{{ k.row.id }}">
+    <div class="dialog-btns">
+      <button type="submit" class="btn-ok"
+        onclick="preparePayoutSubmit({{ k.row.id }})">✅ Bestätigen – Saldo auf 0</button>
+      <button type="button" class="btn-no"
+        onclick="document.getElementById('payout-modal-{{ k.row.id }}').close()">Abbrechen</button>
+    </div>
+  </form>
+
+  {% else %}
+  <p style="color:var(--muted);font-size:14px;">
+    Saldo ist 0 oder negativ – keine Auszahlung möglich.
+  </p>
+  <div class="dialog-btns">
+    <button type="button" class="btn btn-small"
+      onclick="document.getElementById('payout-modal-{{ k.row.id }}').close()">Schließen</button>
+  </div>
+  {% endif %}
+</dialog>
+{% endfor %}
 
 <section class="panel">
   <h2>Wartet auf Bestätigung {% if pending %}<span class="badge">{{ pending|length }}</span>{% endif %}</h2>
@@ -88,5 +187,37 @@
 </section>
 
 <script src="/static/geo.js"></script>
+<script>
+function openPayoutModal(id) {
+  document.getElementById('payout-modal-' + id).showModal();
+}
+function switchMethod(id, method) {
+  document.getElementById('bank-sec-' + id).hidden = (method !== 'bank');
+  document.getElementById('pocket-sec-' + id).hidden = (method !== 'pocket');
+  document.getElementById('method-' + id).value = method;
+}
+function copyText(text) {
+  navigator.clipboard.writeText(text).then(showCopied).catch(() => {});
+}
+function copyEl(elId) {
+  const el = document.getElementById(elId);
+  if (el) copyText(el.value);
+}
+function preparePayoutSubmit(id) {
+  const iban = document.getElementById('iban-' + id);
+  const zweck = document.getElementById('zweck-' + id);
+  if (iban) document.getElementById('iban-h-' + id).value = iban.value;
+  if (zweck) document.getElementById('zweck-h-' + id).value = zweck.value;
+}
+function showCopied() {
+  const t = document.createElement('div');
+  t.textContent = 'Kopiert ✓';
+  t.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);'
+    + 'background:#1f2330;color:#fff;padding:8px 18px;border-radius:99px;'
+    + 'font-size:14px;font-weight:600;z-index:9999;pointer-events:none;';
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 1400);
+}
+</script>
 
 {% endblock %}

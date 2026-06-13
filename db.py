@@ -197,6 +197,7 @@ MIGRATIONS = [
     # (table, column, ddl)
     ("users", "cash_legacy", "ALTER TABLE users ADD COLUMN cash_legacy INTEGER NOT NULL DEFAULT 0"),
     ("users", "email", "ALTER TABLE users ADD COLUMN email TEXT"),
+    ("users", "iban", "ALTER TABLE users ADD COLUMN iban TEXT"),
 ]
 
 
@@ -226,6 +227,14 @@ def child_balance(conn: sqlite3.Connection, child_id: int) -> int:
         (child_id,),
     ).fetchone()["s"]
     return base + s
+
+
+def pocket_balance(conn: sqlite3.Connection, child_id: int) -> int:
+    """Aktueller Taschengeldkonto-Stand in Cent."""
+    return conn.execute(
+        "SELECT COALESCE(SUM(amount), 0) AS s FROM pocket_transactions WHERE child_id = ?",
+        (child_id,),
+    ).fetchone()["s"]
 
 
 def get_setting(conn: sqlite3.Connection, key: str, default: str = "") -> str:

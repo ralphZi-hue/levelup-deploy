@@ -396,3 +396,59 @@ body.role-child .rule-card:active { transform: scale(.97); }
   .board-row .b-level { display: none; }
   .fc-side { font-size: 22px; }
 }
+
+/* ====================================================================== */
+/* Taschengeldkonto & Auszahlungs-Dialog                                  */
+/* ====================================================================== */
+
+.pocket-chip { color: #7c3aed; background: #f5f3ff; border-color: #ddd6fe; }
+
+/* <dialog> Reset + Layout */
+.payout-dialog {
+  border: none;
+  border-radius: 20px;
+  box-shadow: 0 8px 40px rgba(0,0,0,.22);
+  padding: 24px;
+  max-width: 420px;
+  width: calc(100% - 32px);
+}
+.payout-dialog::backdrop { background: rgba(0,0,0,.45); }
+
+.payout-total {
+  font-size: 38px; font-weight: 800; color: var(--plus);
+  text-align: center; margin: 4px 0 18px;
+}
+.payout-total.payout-neg { color: var(--muted); }
+
+/* Methoden-Auswahl */
+.payout-methods { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }
+.payout-opt {
+  display: flex; align-items: center; gap: 10px;
+  font-size: 15px; font-weight: 600; color: var(--ink);
+  background: #f4f5fb; border: 1px solid var(--line); border-radius: 12px;
+  padding: 12px 14px; cursor: pointer;
+}
+.payout-opt input[type=radio] { width: auto; margin: 0; accent-color: var(--brand); }
+
+/* Inhalts-Bereich (Bank / Pocket) */
+.payout-sec {
+  background: #f8f9ff; border: 1px solid var(--line);
+  border-radius: 12px; padding: 12px; margin-bottom: 12px;
+}
+
+/* Copy-Zeilen */
+.copy-row {
+  display: grid;
+  grid-template-columns: 80px 1fr auto;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.copy-row:last-child { margin-bottom: 0; }
+.copy-label { font-size: 12px; color: var(--muted); font-weight: 600; white-space: nowrap; }
+.copy-input { margin: 0; padding: 7px 9px; font-size: 13px; }
+.copy-btn { padding: 6px 10px; font-size: 12px; white-space: nowrap; }
+
+/* Dialog-Buttons */
+.dialog-btns { display: flex; flex-direction: column; gap: 8px; margin-top: 14px; }
+.dialog-btns button { width: 100%; padding: 13px; }

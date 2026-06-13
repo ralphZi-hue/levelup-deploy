@@ -22,8 +22,13 @@ import gamify
 import learn
 import mailer
 from auth import authenticate, hash_password, session_secret
-from db import BASE_DIR, child_balance, db, get_setting, init_db, set_setting
+from db import BASE_DIR, child_balance, pocket_balance, db, get_setting, init_db, set_setting
 from seed import seed
+
+_MONTH_NAMES = [
+    "Januar","Februar","März","April","Mai","Juni",
+    "Juli","August","September","Oktober","November","Dezember",
+]
 
 app = FastAPI(title="LevelUp")
 app.add_middleware(SessionMiddleware, secret_key=session_secret(), max_age=60 * 60 * 24 * 14)
@@ -206,6 +211,7 @@ def child_dashboard(request: Request):
             (user["id"],),
         ).fetchall()
         payout_day = get_setting(conn, "payout_day", "1")
+        pocket = pocket_balance(conn, user["id"])
 
         level = gamify.level_info(_xp(conn, user["id"]))
         week = _weekly_change(conn, user["id"])
@@ -223,7 +229,7 @@ def child_dashboard(request: Request):
             "request": request, "user": user, "balance": balance,
             "recent": recent, "pending": pending, "rules": rules, "tasks": tasks,
             "today": date.today().isoformat(),
-            "payout_day": payout_day, "flash": pop_flash(request),
+            "payout_day": payout_day, "pocket": pocket, "flash": pop_flash(request),
             "level": level, "week": week, "week_trend": _trend(week), "siblings": siblings,
         },
     )
@@ -360,9 +366,15 @@ def admin_dashboard(request: Request):
         children = conn.execute(
             "SELECT * FROM users WHERE role = 'child' ORDER BY name"
         ).fetchall()
+        today = date.today()
+        current_month = f"{_MONTH_NAMES[today.month - 1]} {today.year}"
         kids = []
         for c in children:
-            kids.append({"row": c, "balance": child_balance(conn, c["id"])})
+            kids.append({
+                "row": c,
+                "balance": child_balance(conn, c["id"]),
+                "pocket": pocket_balance(conn, c["id"]),
+            })
         pending = conn.execute(
             "SELECT t.*, u.name AS child_name, "
             "(SELECT e.id FROM evidence e WHERE e.tx_id = t.id LIMIT 1) AS evidence_id "
@@ -376,7 +388,8 @@ def admin_dashboard(request: Request):
         request, "admin.html",
         {
             "request": request, "user": user, "kids": kids,
-            "pending": pending, "rules": rules, "flash": pop_flash(request),
+            "pending": pending, "rules": rules,
+            "current_month": current_month, "flash": pop_flash(request),
         },
     )
 
@@ -455,23 +468,79 @@ def admin_book(
 
 
 @app.post("/admin/payout")
-def admin_payout(request: Request, child_id: int = Form(...)):
-    """Auszahlung/Überweisung erfasst – Saldo wird auf 0 zurückgesetzt."""
+def admin_payout(
+    request: Request,
+    child_id: int = Form(...),
+    method: str = Form("bank"),
+    iban: str = Form(""),
+    verwendungszweck: str = Form(""),
+):
+    """Auszahlung erfassen – entweder als Banküberweisung oder ans Taschengeldkonto."""
     with db() as conn:
         user = current_user(request, conn)
         if not user or user["role"] != "admin":
             return RedirectResponse("/", status_code=303)
         balance = child_balance(conn, child_id)
-        if balance == 0:
-            flash(request, "Saldo ist bereits 0.")
+        if balance <= 0:
+            flash(request, "Saldo ist 0 oder negativ – keine Auszahlung möglich.")
             return RedirectResponse("/admin", status_code=303)
+        if iban.strip():
+            conn.execute("UPDATE users SET iban = ? WHERE id = ?", (iban.strip(), child_id))
+        if method == "pocket":
+            note = "Saldo aufs Taschengeldkonto übertragen"
+        else:
+            zweck = verwendungszweck.strip() or "Saldo ausgezahlt"
+            note = f"Überweisung · {zweck}"
         conn.execute(
             "INSERT INTO transactions(child_id, title, amount, status, note, "
             "created_by, decided_by, decided_at) "
-            "VALUES(?,'Auszahlung',?, 'approved', 'Saldo ausgezahlt/überwiesen', ?, ?, datetime('now'))",
-            (child_id, -balance, user["id"], user["id"]),
+            "VALUES(?,'Auszahlung',?,'approved',?,?,?,datetime('now'))",
+            (child_id, -balance, note, user["id"], user["id"]),
         )
-    flash(request, "Auszahlung erfasst – Saldo auf 0 zurückgesetzt. ✅")
+        if method == "pocket":
+            conn.execute(
+                "INSERT INTO pocket_transactions(child_id, amount, type, note, created_by) "
+                "VALUES(?,?,'payout',?,?)",
+                (child_id, balance, "Auszahlung aus App-Saldo", user["id"]),
+            )
+            flash(request, "Saldo aufs Taschengeldkonto übertragen. ✅")
+        else:
+            flash(request, "Banküberweisung notiert – Saldo auf 0 zurückgesetzt. ✅")
+    return RedirectResponse("/admin", status_code=303)
+
+
+@app.post("/admin/pocket/book")
+def admin_pocket_book(
+    request: Request,
+    child_id: int = Form(...),
+    type: str = Form(...),
+    amount: str = Form(...),
+    note: str = Form(""),
+):
+    """Manuelle Einzahlung oder Abhebung auf dem Taschengeldkonto."""
+    with db() as conn:
+        user = current_user(request, conn)
+        if not user or user["role"] != "admin":
+            return RedirectResponse("/", status_code=303)
+        if type not in ("deposit", "withdrawal"):
+            flash(request, "Ungültiger Typ.", "err")
+            return RedirectResponse("/admin", status_code=303)
+        try:
+            cents = int(round(float(amount.replace(",", ".")) * 100))
+        except ValueError:
+            flash(request, "Betrag ungültig.", "err")
+            return RedirectResponse("/admin", status_code=303)
+        if cents <= 0:
+            flash(request, "Betrag muss größer als 0 sein.", "err")
+            return RedirectResponse("/admin", status_code=303)
+        signed = cents if type == "deposit" else -cents
+        conn.execute(
+            "INSERT INTO pocket_transactions(child_id, amount, type, note, created_by) "
+            "VALUES(?,?,?,?,?)",
+            (child_id, signed, type, note.strip() or None, user["id"]),
+        )
+    label = "Einzahlung" if type == "deposit" else "Abhebung"
+    flash(request, f"{label} auf Taschengeldkonto gebucht. ✅")
     return RedirectResponse("/admin", status_code=303)
 
 
