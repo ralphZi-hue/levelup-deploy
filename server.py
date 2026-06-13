@@ -1058,6 +1058,53 @@ def admin_invite_cancel(request: Request, invite_id: int):
     return RedirectResponse("/admin/users", status_code=303)
 
 
+@app.post("/admin/users/{user_id}/delete")
+def admin_user_delete(request: Request, user_id: int):
+    with db() as conn:
+        user = current_user(request, conn)
+        if not user or user["role"] != "admin":
+            return RedirectResponse("/", status_code=303)
+        if user["id"] == user_id:
+            flash(request, "Du kannst dich nicht selbst löschen.", "err")
+            return RedirectResponse("/admin/users", status_code=303)
+        target = conn.execute("SELECT name FROM users WHERE id = ?", (user_id,)).fetchone()
+        if not target:
+            flash(request, "Benutzer nicht gefunden.", "err")
+            return RedirectResponse("/admin/users", status_code=303)
+        name = target["name"]
+        conn.execute("DELETE FROM transactions WHERE child_id = ?", (user_id,))
+        conn.execute("DELETE FROM claims WHERE child_id = ?", (user_id,))
+        conn.execute("DELETE FROM dinner_claims WHERE child_id = ?", (user_id,))
+        conn.execute("DELETE FROM pocket_transactions WHERE child_id = ?", (user_id,))
+        conn.execute("DELETE FROM users WHERE id = ?", (user_id,))
+    flash(request, f"{name} wurde gelöscht.")
+    return RedirectResponse("/admin/users", status_code=303)
+
+
+@app.post("/admin/users/{user_id}/reset-password")
+def admin_user_reset_password(
+    request: Request, user_id: int,
+    new_password: str = Form(...),
+):
+    with db() as conn:
+        user = current_user(request, conn)
+        if not user or user["role"] != "admin":
+            return RedirectResponse("/", status_code=303)
+        if len(new_password) < 4:
+            flash(request, "Passwort muss mindestens 4 Zeichen haben.", "err")
+            return RedirectResponse("/admin/users", status_code=303)
+        target = conn.execute("SELECT name FROM users WHERE id = ?", (user_id,)).fetchone()
+        if not target:
+            flash(request, "Benutzer nicht gefunden.", "err")
+            return RedirectResponse("/admin/users", status_code=303)
+        conn.execute(
+            "UPDATE users SET password_hash = ? WHERE id = ?",
+            (hash_password(new_password), user_id),
+        )
+    flash(request, f"Passwort für {target['name']} wurde zurückgesetzt. ✅")
+    return RedirectResponse("/admin/users", status_code=303)
+
+
 @app.post("/admin/users/smtp")
 def admin_smtp_settings(
     request: Request,
