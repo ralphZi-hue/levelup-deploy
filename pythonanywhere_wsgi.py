@@ -16,4 +16,15 @@ from a2wsgi import ASGIMiddleware
 
 from server import app as _asgi_app
 
-application = ASGIMiddleware(_asgi_app)
+# ASGIMiddleware startet einen Hintergrund-Thread mit eigenem Event-Loop.
+# uWSGI laedt dieses Modul im Master-Prozess und forkt danach die Worker --
+# Threads ueberleben einen fork() nicht. Daher die Instanz erst bei der
+# ersten Anfrage (im Worker-Prozess) erzeugen, nicht beim Modul-Import.
+_application: ASGIMiddleware | None = None
+
+
+def application(environ, start_response):
+    global _application
+    if _application is None:
+        _application = ASGIMiddleware(_asgi_app)
+    return _application(environ, start_response)
