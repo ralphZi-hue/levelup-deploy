@@ -194,7 +194,101 @@ input:focus, select:focus { outline: 2px solid var(--brand); border-color: var(-
 .hint-inline { color: var(--muted); font-size: 12px; }
 .muted-cell { color: var(--muted); }
 
+/* ====================================================================== */
+/* Gamification – Kinder-Seite                                            */
+/* ====================================================================== */
+
+/* Verspielterer Hero für Kinder */
+body.role-child .hero {
+  background: linear-gradient(135deg, #6d5efc 0%, #8b5cf6 45%, #ec4899 100%);
+  position: relative; overflow: hidden;
+}
+body.role-child .hero::after {
+  content: ""; position: absolute; inset: 0;
+  background: radial-gradient(circle at 80% -20%, rgba(255,255,255,.25), transparent 50%);
+  pointer-events: none;
+}
+.hero-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; position: relative; z-index: 1; }
+.level-badge {
+  background: rgba(255,255,255,.22); backdrop-filter: blur(4px);
+  padding: 6px 12px; border-radius: 999px; font-weight: 700; font-size: 13px;
+}
+.sound-toggle {
+  background: rgba(255,255,255,.22); border: none; padding: 6px 10px; border-radius: 999px;
+  font-size: 15px; line-height: 1; cursor: pointer;
+}
+.sound-toggle:hover { background: rgba(255,255,255,.35); }
+
+.hero-amount.pop { animation: pop 0.6s ease; }
+@keyframes pop { 0%{transform:scale(1)} 35%{transform:scale(1.14)} 100%{transform:scale(1)} }
+
+.level-bar {
+  height: 12px; background: rgba(255,255,255,.25); border-radius: 999px;
+  overflow: hidden; margin: 12px 0 6px; position: relative; z-index: 1;
+}
+.level-fill {
+  height: 100%; border-radius: 999px;
+  background: linear-gradient(90deg, #ffe066, #ffd43b);
+  box-shadow: 0 0 12px rgba(255,224,102,.8);
+  transition: width 1s cubic-bezier(.22,1,.36,1);
+}
+.level-meta { font-size: 13px; opacity: .95; position: relative; z-index: 1; }
+
+.hero.levelup { animation: levelglow 1.2s ease; }
+@keyframes levelglow {
+  0%,100% { box-shadow: var(--shadow); }
+  30% { box-shadow: 0 0 0 4px #ffd43b, 0 0 40px 8px rgba(255,212,59,.7); }
+}
+
+/* Stat-Chips */
+.chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0 4px; }
+.chip {
+  background: var(--card); border: 1px solid var(--line); border-radius: 999px;
+  padding: 7px 13px; font-size: 13px; font-weight: 600; box-shadow: var(--shadow);
+}
+.chip.up, .chip.up2 { color: var(--plus); border-color: #b8ebc9; background: #f0fbf4; }
+.chip.down, .chip.down2 { color: var(--minus); border-color: #f4c2c2; background: #fdf2f2; }
+.chip.wait { color: #b45309; background: #fffaf0; border-color: #f3dca6; }
+.chip.xp { color: var(--brand); background: #f1f0ff; border-color: #d9d6ff; }
+
+/* Leaderboard */
+.board { display: flex; flex-direction: column; gap: 8px; }
+.board-row {
+  display: grid; grid-template-columns: auto 1fr auto auto; align-items: center; gap: 12px;
+  background: var(--card); border: 1px solid var(--line); border-radius: 14px;
+  padding: 12px 16px; box-shadow: var(--shadow);
+}
+.board-row.me { border: 2px solid var(--brand); background: #f7f6ff; }
+.b-emoji { font-size: 24px; }
+.b-name { font-weight: 700; }
+.b-level { font-size: 13px; color: var(--muted); font-weight: 600; }
+.b-trend { font-size: 13px; font-weight: 700; white-space: nowrap; }
+.b-trend.up, .b-trend.up2 { color: var(--plus); }
+.b-trend.down, .b-trend.down2 { color: var(--minus); }
+.b-trend.flat { color: var(--muted); }
+
+/* Größere, griffigere Regelkarten für Kinder */
+body.role-child .rule-card { border-radius: 18px; }
+body.role-child .rule-card:active { transform: scale(.97); }
+
+/* Konfetti */
+.confetti {
+  position: fixed; top: -30px; z-index: 9999; pointer-events: none;
+  animation: confettifall linear forwards;
+}
+@keyframes confettifall {
+  0% { transform: translateY(0) rotate(0deg); opacity: 1; }
+  100% { transform: translateY(105vh) rotate(540deg); opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .confetti { display: none; }
+  .hero-amount.pop, .hero.levelup { animation: none; }
+}
+
 @media (max-width: 480px) {
   .hero-amount { font-size: 44px; }
   .book-form { grid-template-columns: 1fr; }
+  .board-row { grid-template-columns: auto 1fr auto; }
+  .board-row .b-level { display: none; }
 }

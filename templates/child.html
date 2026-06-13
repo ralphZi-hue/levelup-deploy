@@ -2,15 +2,57 @@
 {% block title %}Mein Konto · FamBank{% endblock %}
 {% block content %}
 
-<section class="hero">
+{% set trend_labels = {
+  'up2':'🚀 stark dabei', 'up':'▲ im Plus', 'flat':'• ruhig',
+  'down':'▼ im Minus', 'down2':'⚠️ verloren'
+} %}
+
+<section class="hero" id="hero" data-cents="{{ balance }}" data-uid="{{ user.id }}" data-level="{{ level.level }}">
+  <div class="hero-top">
+    <div class="level-badge">{{ level.emoji }} Level {{ level.level }} · {{ level.name }}</div>
+    <button class="sound-toggle" id="soundToggle" type="button" title="Ton an/aus">🔊</button>
+  </div>
+
   <div class="hero-label">Voraussichtliche nächste Auszahlung</div>
-  <div class="hero-amount {{ 'neg' if balance < 0 else '' }}">{{ balance|euro }}</div>
+  <div class="hero-amount {{ 'neg' if balance < 0 else '' }}" id="balanceAmount" data-cents="{{ balance }}">{{ balance|euro }}</div>
+
+  <div class="level-bar"><div class="level-fill" style="width: {{ level.pct }}%"></div></div>
+  <div class="level-meta">
+    {% if level.to_next > 0 %}Noch <strong>{{ level.to_next|euro }}</strong> bis Level {{ level.level + 1 }} 🎯{% else %}Maximal-Level erreicht! 🌟{% endif %}
+  </div>
+
   <div class="hero-sub">Auszahlung am {{ payout_day }}. des Monats · Hallo {{ user.name }}! 👋</div>
-  {% if pending %}<div class="hero-pending">{{ pending }} Antrag/Anträge warten auf Bestätigung</div>{% endif %}
 </section>
 
+<div class="chips">
+  <div class="chip {{ week_trend }}">Diese Woche {{ '+' if week >= 0 else '' }}{{ week|euro }}</div>
+  <div class="chip xp">⚡ {{ level.xp|euro }} verdient</div>
+  {% if pending %}<div class="chip wait">⏳ {{ pending }} wartet auf Bestätigung</div>{% endif %}
+</div>
+
+{% if siblings %}
+<h2>🏅 Wer ist gerade vorne?</h2>
+<div class="board">
+  <div class="board-row me">
+    <span class="b-emoji">{{ level.emoji }}</span>
+    <span class="b-name">Du</span>
+    <span class="b-level">Level {{ level.level }}</span>
+    <span class="b-trend {{ week_trend }}">{{ trend_labels[week_trend] }}</span>
+  </div>
+  {% for s in siblings %}
+  <div class="board-row">
+    <span class="b-emoji">{{ s.level.emoji }}</span>
+    <span class="b-name">{{ s.name }}</span>
+    <span class="b-level">Level {{ s.level.level }}</span>
+    <span class="b-trend {{ s.trend }}">{{ trend_labels[s.trend] }}</span>
+  </div>
+  {% endfor %}
+</div>
+<p class="hint">Du siehst nur Level und Trend – nicht den genauen Kontostand der anderen. 🤫</p>
+{% endif %}
+
 <h2>Was möchtest du eintragen?</h2>
-<p class="hint">Such dir aus der Liste, was du gemacht hast. Mama oder Papa bestätigen es dann.</p>
+<p class="hint">Such dir aus, was du gemacht hast. Mama oder Papa bestätigen es dann.</p>
 
 {% set cats = {'schule':'📚 Schule', 'haushalt':'🏠 Haushalt', 'verhalten':'⭐ Verhalten'} %}
 {% for key, label in cats.items() %}
@@ -49,4 +91,5 @@
   {% endfor %}
 </div>
 
+<script src="/static/gamify.js"></script>
 {% endblock %}

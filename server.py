@@ -16,6 +16,7 @@ from starlette.middleware.sessions import SessionMiddleware
 import sqlite3
 
 import evidence as ev
+import gamify
 from auth import authenticate, session_secret
 from db import BASE_DIR, child_balance, db, get_setting, init_db
 from seed import seed
@@ -62,6 +63,38 @@ def _f(v: str):
         return float(v) if v not in (None, "") else None
     except (TypeError, ValueError):
         return None
+
+
+def _xp(conn: sqlite3.Connection, child_id: int) -> int:
+    """Lebenslang verdiente XP = Summe aller bestätigten Gutschriften (positive Beträge)."""
+    return conn.execute(
+        "SELECT COALESCE(SUM(amount), 0) AS s FROM transactions "
+        "WHERE child_id = ? AND status = 'approved' AND amount > 0",
+        (child_id,),
+    ).fetchone()["s"]
+
+
+def _weekly_change(conn: sqlite3.Connection, child_id: int) -> int:
+    """Netto-Veränderung der letzten 7 Tage (bestätigt), in Cent."""
+    return conn.execute(
+        "SELECT COALESCE(SUM(amount), 0) AS s FROM transactions "
+        "WHERE child_id = ? AND status = 'approved' "
+        "AND COALESCE(decided_at, created_at) >= datetime('now', '-7 days')",
+        (child_id,),
+    ).fetchone()["s"]
+
+
+def _trend(cents: int) -> str:
+    """Grobe Richtung für den Vergleich – ohne genaue Beträge zu verraten."""
+    if cents > 200:
+        return "up2"      # stark im Plus
+    if cents > 0:
+        return "up"
+    if cents < -200:
+        return "down2"    # stark im Minus
+    if cents < 0:
+        return "down"
+    return "flat"
 
 
 def attach_evidence(
@@ -163,12 +196,24 @@ def child_dashboard(request: Request):
             "SELECT * FROM rules WHERE active = 1 ORDER BY category, amount DESC"
         ).fetchall()
         payout_day = get_setting(conn, "payout_day", "1")
+
+        level = gamify.level_info(_xp(conn, user["id"]))
+        week = _weekly_change(conn, user["id"])
+        # Geschwister-Vergleich: nur Level + Trend, keine genauen Beträge
+        siblings = []
+        for c in conn.execute(
+            "SELECT id, name FROM users WHERE role = 'child' AND id != ? ORDER BY name",
+            (user["id"],),
+        ).fetchall():
+            li = gamify.level_info(_xp(conn, c["id"]))
+            siblings.append({"name": c["name"], "level": li, "trend": _trend(_weekly_change(conn, c["id"]))})
     return templates.TemplateResponse(
         "child.html",
         {
             "request": request, "user": user, "balance": balance,
             "recent": recent, "pending": pending, "rules": rules,
             "payout_day": payout_day, "flash": pop_flash(request),
+            "level": level, "week": week, "week_trend": _trend(week), "siblings": siblings,
         },
     )
 
