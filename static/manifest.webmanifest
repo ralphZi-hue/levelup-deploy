@@ -1,0 +1,12 @@
+{
+  "name": "FamBank",
+  "short_name": "FamBank",
+  "description": "Taschengeld, Aufgaben und Lernen für die Familie",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f4f5fb",
+  "theme_color": "#4f46e5",
+  "icons": [
+    { "src": "/static/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

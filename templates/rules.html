@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}Regelwerk · FamBank{% endblock %}
+{% block content %}
+
+<h1>Regelwerk</h1>
+<p class="hint">Diese Liste sehen auch die Kinder. Positive Beträge = Gutschrift, negative = Belastung.</p>
+
+<section class="panel">
+  <h2>Neue Regel</h2>
+  <form method="post" action="/admin/rules/add" class="book-form">
+    <label class="wide">Titel <input name="title" required placeholder="z.B. Müll rausbringen"></label>
+    <label>Kategorie
+      <select name="category">
+        <option value="schule">📚 Schule</option>
+        <option value="haushalt">🏠 Haushalt</option>
+        <option value="verhalten">⭐ Verhalten</option>
+      </select>
+    </label>
+    <label>Betrag € <input name="amount" required placeholder="0,50 oder -1"></label>
+    <label>Beweisfoto?
+      <select name="requires_proof">
+        <option value="0">nein</option>
+        <option value="1">ja (Phase 2)</option>
+      </select>
+    </label>
+    <button type="submit">Hinzufügen</button>
+  </form>
+</section>
+
+<section class="panel">
+  <h2>Alle Regeln</h2>
+  <table class="rules-table">
+    <thead><tr><th>Titel</th><th>Kategorie</th><th>Betrag</th><th>Foto</th><th>Status</th><th></th></tr></thead>
+    <tbody>
+      {% for r in rules %}
+        <tr class="{{ '' if r.active else 'inactive' }}">
+          <td>{{ r.title }}</td>
+          <td>{{ r.category }}</td>
+          <td class="{{ 'plus' if r.amount >= 0 else 'minus' }}">{{ r.amount|euro }}</td>
+          <td>{{ '📷' if r.requires_proof else '–' }}</td>
+          <td>{{ 'aktiv' if r.active else 'inaktiv' }}</td>
+          <td>
+            <form method="post" action="/admin/rules/{{ r.id }}/toggle">
+              <button class="btn-small">{{ 'Deaktivieren' if r.active else 'Aktivieren' }}</button>
+            </form>
+          </td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+
+{% endblock %}

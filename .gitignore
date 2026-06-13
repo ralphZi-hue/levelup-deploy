@@ -1,0 +1,6 @@
+# FamBank – lokale, nicht zu versionierende Dateien
+.venv/
+__pycache__/
+*.pyc
+data/*.db
+data/.session_secret

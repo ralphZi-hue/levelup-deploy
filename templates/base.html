@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#4f46e5">
+  <link rel="manifest" href="/static/manifest.webmanifest">
+  <link rel="apple-touch-icon" href="/static/icon.svg">
+  <link rel="icon" href="/static/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/static/style.css">
+  <title>{% block title %}FamBank{% endblock %}</title>
+</head>
+<body class="role-{{ user.role if user else 'guest' }}">
+  {% if user %}
+  <header class="topbar">
+    <a class="brand" href="/">🏦 FamBank</a>
+    <nav>
+      {% if user.role == 'admin' %}
+        <a href="/admin">Übersicht</a>
+        <a href="/admin/rules">Regelwerk</a>
+      {% else %}
+        <a href="/me">Mein Konto</a>
+      {% endif %}
+      <span class="who">{{ user.name }}</span>
+      <a class="logout" href="/logout">Abmelden</a>
+    </nav>
+  </header>
+  {% endif %}
+
+  <main class="wrap">
+    {% if flash %}
+      <div class="flash {{ flash.kind }}">{{ flash.msg }}</div>
+    {% endif %}
+    {% block content %}{% endblock %}
+  </main>
+
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => navigator.serviceWorker.register('/static/sw.js'));
+    }
+  </script>
+</body>
+</html>

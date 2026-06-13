@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}Mein Konto · FamBank{% endblock %}
+{% block content %}
+
+<section class="hero">
+  <div class="hero-label">Voraussichtliche nächste Auszahlung</div>
+  <div class="hero-amount {{ 'neg' if balance < 0 else '' }}">{{ balance|euro }}</div>
+  <div class="hero-sub">Auszahlung am {{ payout_day }}. des Monats · Hallo {{ user.name }}! 👋</div>
+  {% if pending %}<div class="hero-pending">{{ pending }} Antrag/Anträge warten auf Bestätigung</div>{% endif %}
+</section>
+
+<h2>Was möchtest du eintragen?</h2>
+<p class="hint">Such dir aus der Liste, was du gemacht hast. Mama oder Papa bestätigen es dann.</p>
+
+{% set cats = {'schule':'📚 Schule', 'haushalt':'🏠 Haushalt', 'verhalten':'⭐ Verhalten'} %}
+{% for key, label in cats.items() %}
+  {% set items = rules | selectattr('category','equalto',key) | list %}
+  {% if items %}
+  <div class="cat">
+    <h3>{{ label }}</h3>
+    <div class="rule-grid">
+      {% for r in items %}
+        <form method="post" action="/claim" class="rule-card {{ 'plus' if r.amount >= 0 else 'minus' }}">
+          <input type="hidden" name="rule_id" value="{{ r.id }}">
+          <div class="rule-title">{{ r.title }}</div>
+          <div class="rule-amount">{{ r.amount|euro }}</div>
+          {% if r.requires_proof %}<div class="rule-proof">📷 Foto folgt (Phase 2)</div>{% endif %}
+          <button type="submit">Eintragen</button>
+        </form>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+{% endfor %}
+
+<h2>Letzte Buchungen</h2>
+<div class="ledger">
+  {% for t in recent %}
+    <div class="ledger-row status-{{ t.status }}">
+      <div class="l-main">
+        <span class="l-title">{{ t.title }}</span>
+        <span class="l-status">
+          {% if t.status == 'pending' %}⏳ wartet{% elif t.status == 'approved' %}✅ bestätigt{% else %}❌ abgelehnt{% endif %}
+        </span>
+      </div>
+      <div class="l-amount {{ 'plus' if t.amount >= 0 else 'minus' }}">{{ t.amount|euro }}</div>
+    </div>
+  {% else %}
+    <p class="empty">Noch keine Buchungen.</p>
+  {% endfor %}
+</div>
+
+{% endblock %}

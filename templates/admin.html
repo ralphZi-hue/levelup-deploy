@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}Übersicht · FamBank{% endblock %}
+{% block content %}
+
+<h1>Übersicht</h1>
+
+<div class="kid-cards">
+  {% for k in kids %}
+    <div class="kid-card">
+      <div class="kid-name">{{ k.row.name }}</div>
+      <div class="kid-balance {{ 'neg' if k.balance < 0 else '' }}">{{ k.balance|euro }}</div>
+      <div class="kid-sub">voraussichtliche Auszahlung</div>
+    </div>
+  {% endfor %}
+</div>
+
+<section class="panel">
+  <h2>Wartet auf Bestätigung {% if pending %}<span class="badge">{{ pending|length }}</span>{% endif %}</h2>
+  {% if pending %}
+    <div class="approvals">
+      {% for t in pending %}
+        <div class="approval-row">
+          <div class="a-info">
+            <span class="a-child">{{ t.child_name }}</span>
+            <span class="a-title">{{ t.title }}</span>
+            {% if t.note %}<span class="a-note">„{{ t.note }}"</span>{% endif %}
+          </div>
+          <div class="a-amount {{ 'plus' if t.amount >= 0 else 'minus' }}">{{ t.amount|euro }}</div>
+          <form method="post" action="/admin/tx/{{ t.id }}/decide" class="a-actions">
+            <button name="action" value="approve" class="btn-ok">Bestätigen</button>
+            <button name="action" value="reject" class="btn-no">Ablehnen</button>
+          </form>
+        </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <p class="empty">Nichts offen. 🎉</p>
+  {% endif %}
+</section>
+
+<section class="panel">
+  <h2>Direkt buchen</h2>
+  <p class="hint">Sofort gültig – z.B. ein Vergehen erfassen oder eine Belohnung gutschreiben.</p>
+  <form method="post" action="/admin/book" class="book-form">
+    <label>Kind
+      <select name="child_id" required>
+        {% for k in kids %}<option value="{{ k.row.id }}">{{ k.row.name }}</option>{% endfor %}
+      </select>
+    </label>
+    <label>Aus Regelwerk
+      <select name="rule_id">
+        <option value="0">— eigener Eintrag —</option>
+        {% for r in rules %}
+          <option value="{{ r.id }}">{{ r.title }} ({{ r.amount|euro }})</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>Eigener Titel <input name="custom_title" placeholder="z.B. Handtuch liegen gelassen"></label>
+    <label>Betrag € <input name="custom_amount" placeholder="z.B. -1,50 oder 2"></label>
+    <label class="wide">Notiz <input name="note" placeholder="optional"></label>
+    <button type="submit">Buchen</button>
+  </form>
+</section>
+
+{% endblock %}
