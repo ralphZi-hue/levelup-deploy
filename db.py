@@ -90,9 +90,32 @@ CREATE TABLE IF NOT EXISTS evidence (
     uploaded_by   INTEGER NOT NULL REFERENCES users(id)
 );
 
+CREATE TABLE IF NOT EXISTS decks (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    title       TEXT    NOT NULL,                -- z.B. "Unit 5 Vokabeln"
+    subject     TEXT    NOT NULL,                -- z.B. Englisch, Mathe, Biologie
+    child_id    INTEGER NOT NULL REFERENCES users(id),   -- für welches Kind
+    created_by  INTEGER NOT NULL REFERENCES users(id),
+    created_at  TEXT    NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS cards (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    deck_id     INTEGER NOT NULL REFERENCES decks(id) ON DELETE CASCADE,
+    front       TEXT    NOT NULL,                -- Frage / Vokabel
+    back        TEXT    NOT NULL,                -- Antwort / Übersetzung
+    box         INTEGER NOT NULL DEFAULT 1,      -- Leitner-Fach 1..5
+    due_at      TEXT,                            -- nächste Fälligkeit (ISO); NULL = sofort
+    last_result TEXT,                            -- 'correct' / 'wrong'
+    reviews     INTEGER NOT NULL DEFAULT 0,
+    created_at  TEXT    NOT NULL DEFAULT (datetime('now'))
+);
+
 CREATE INDEX IF NOT EXISTS idx_tx_child  ON transactions(child_id);
 CREATE INDEX IF NOT EXISTS idx_tx_status ON transactions(status);
 CREATE INDEX IF NOT EXISTS idx_ev_tx     ON evidence(tx_id);
+CREATE INDEX IF NOT EXISTS idx_deck_child ON decks(child_id);
+CREATE INDEX IF NOT EXISTS idx_card_deck  ON cards(deck_id);
 """
 
 
