@@ -18,8 +18,10 @@
       {% if user.role == 'admin' %}
         <a href="/admin">Übersicht</a>
         <a href="/admin/rules">Regelwerk</a>
+        <a href="/admin/learn">Lernen</a>
       {% else %}
         <a href="/me">Mein Konto</a>
+        <a href="/learn">📚 Lernen</a>
       {% endif %}
       <span class="who">{{ user.name }}</span>
       <a class="logout" href="/logout">Abmelden</a>

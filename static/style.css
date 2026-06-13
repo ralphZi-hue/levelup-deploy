@@ -61,11 +61,12 @@ button:active { transform: scale(.98); }
 .btn-no { background: #eef0f8; color: var(--minus); }
 
 label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 12px; font-weight: 600; }
-input, select {
+input, select, textarea {
   font: inherit; width: 100%; margin-top: 5px; padding: 11px 12px;
   border: 1px solid var(--line); border-radius: 12px; background: #fff; color: var(--ink);
 }
-input:focus, select:focus { outline: 2px solid var(--brand); border-color: var(--brand); }
+textarea { resize: vertical; line-height: 1.5; }
+input:focus, select:focus, textarea:focus { outline: 2px solid var(--brand); border-color: var(--brand); }
 
 /* ---- Login ---- */
 .login-card {
@@ -286,9 +287,58 @@ body.role-child .rule-card:active { transform: scale(.97); }
   .hero-amount.pop, .hero.levelup { animation: none; }
 }
 
+/* ====================================================================== */
+/* Lernen – Karteikasten & Übung                                          */
+/* ====================================================================== */
+.deck-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px,1fr)); gap: 12px; }
+.deck-card { background: var(--card); border: 1px solid var(--line); border-radius: 16px;
+  padding: 16px; box-shadow: var(--shadow); display: flex; flex-direction: column; gap: 6px; }
+.deck-subject { font-size: 12px; color: var(--muted); font-weight: 600; }
+.deck-title { font-weight: 700; font-size: 16px; }
+.deck-stats { font-size: 13px; color: var(--muted); }
+.ds-due { font-weight: 600; }
+.ds-due.has { color: var(--brand); }
+.ds-sep { opacity: .5; }
+.deck-go { margin-top: 6px; font-weight: 700; color: var(--brand); }
+.deck-done { margin-top: 6px; font-size: 13px; color: var(--plus); font-weight: 600; }
+
+.practice-head { display: flex; flex-direction: column; margin-bottom: 12px; }
+.ph-subject { font-size: 13px; color: var(--muted); font-weight: 600; }
+.ph-title { font-size: 20px; font-weight: 700; }
+
+.prog { height: 10px; background: #e9eaf3; border-radius: 999px; overflow: hidden; }
+.prog-fill { height: 100%; background: linear-gradient(90deg, var(--brand), #8b5cf6);
+  border-radius: 999px; transition: width .3s ease; }
+.prog-meta { text-align: right; font-size: 12px; color: var(--muted); margin: 5px 0 16px; }
+
+/* Karten-Flip */
+.flashcard { position: relative; min-height: 200px; perspective: 1000px; }
+.fc-side { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  text-align: center; padding: 24px; border-radius: 20px; box-shadow: var(--shadow);
+  font-size: 26px; font-weight: 700; backface-visibility: hidden;
+  transition: transform .5s cubic-bezier(.4,.2,.2,1); }
+.fc-front { background: var(--card); color: var(--ink); border: 1px solid var(--line); }
+.fc-back { background: linear-gradient(135deg, #6d5efc, #8b5cf6); color: #fff;
+  transform: rotateY(180deg); }
+.flashcard.flipped .fc-front { transform: rotateY(180deg); }
+.flashcard.flipped .fc-back { transform: rotateY(360deg); }
+
+.reveal-btn { width: 100%; margin-top: 16px; padding: 15px; font-size: 16px; }
+.answer-btns { display: flex; gap: 10px; margin-top: 16px; }
+.answer-btns button { flex: 1; padding: 16px; font-size: 16px; }
+.ans-yes { background: var(--plus); }
+.ans-no { background: #fff; color: var(--minus); border: 2px solid #f4c2c2; }
+
+.done-area { text-align: center; padding: 30px 16px; }
+.done-emoji { font-size: 56px; }
+.done-area .deck-go { display: inline-block; margin-top: 14px; }
+
+.danger-zone { border: 1px dashed #f4c2c2; box-shadow: none; }
+
 @media (max-width: 480px) {
   .hero-amount { font-size: 44px; }
   .book-form { grid-template-columns: 1fr; }
   .board-row { grid-template-columns: auto 1fr auto; }
   .board-row .b-level { display: none; }
+  .fc-side { font-size: 22px; }
 }

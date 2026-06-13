@@ -478,3 +478,191 @@ def toggle_rule(request: Request, rule_id: int):
             return RedirectResponse("/", status_code=303)
         conn.execute("UPDATE rules SET active = 1 - active WHERE id = ?", (rule_id,))
     return RedirectResponse("/admin/rules", status_code=303)
+
+
+# ---------------------------------------------------------------------------
+# Lernen – Leitner-Karteikasten (Kind: üben)
+# ---------------------------------------------------------------------------
+
+def _deck_stats(conn: sqlite3.Connection, deck_id: int) -> dict:
+    total = conn.execute("SELECT COUNT(*) AS c FROM cards WHERE deck_id = ?", (deck_id,)).fetchone()["c"]
+    due = conn.execute(
+        "SELECT COUNT(*) AS c FROM cards WHERE deck_id = ? AND (due_at IS NULL OR due_at <= datetime('now'))",
+        (deck_id,),
+    ).fetchone()["c"]
+    learned = conn.execute(
+        "SELECT COUNT(*) AS c FROM cards WHERE deck_id = ? AND box >= 5", (deck_id,)
+    ).fetchone()["c"]
+    return {"total": total, "due": due, "learned": learned}
+
+
+@app.get("/learn", response_class=HTMLResponse)
+def learn_home(request: Request):
+    with db() as conn:
+        user = current_user(request, conn)
+        if not user or user["role"] != "child":
+            return RedirectResponse("/", status_code=303)
+        rows = conn.execute(
+            "SELECT * FROM decks WHERE child_id = ? ORDER BY subject, title", (user["id"],)
+        ).fetchall()
+        decks = [{"row": d, "stats": _deck_stats(conn, d["id"])} for d in rows]
+    return templates.TemplateResponse(
+        "learn_child.html",
+        {"request": request, "user": user, "decks": decks, "flash": pop_flash(request)},
+    )
+
+
+@app.get("/learn/{deck_id}", response_class=HTMLResponse)
+def learn_practice(request: Request, deck_id: int):
+    with db() as conn:
+        user = current_user(request, conn)
+        if not user or user["role"] != "child":
+            return RedirectResponse("/", status_code=303)
+        deck = conn.execute(
+            "SELECT * FROM decks WHERE id = ? AND child_id = ?", (deck_id, user["id"])
+        ).fetchone()
+        if not deck:
+            flash(request, "Karteikasten nicht gefunden.", "err")
+            return RedirectResponse("/learn", status_code=303)
+        cards = conn.execute(
+            "SELECT id, front, back, box FROM cards WHERE deck_id = ? "
+            "AND (due_at IS NULL OR due_at <= datetime('now')) ORDER BY box, RANDOM() LIMIT 30",
+            (deck_id,),
+        ).fetchall()
+    return templates.TemplateResponse(
+        "practice.html",
+        {"request": request, "user": user, "deck": deck,
+         "cards": [dict(c) for c in cards]},
+    )
+
+
+@app.post("/learn/card/{card_id}/answer")
+def learn_answer(request: Request, card_id: int, correct: str = Form(...)):
+    """Wird per fetch() aus der Übungs-Seite aufgerufen; aktualisiert das Leitner-Fach."""
+    with db() as conn:
+        user = current_user(request, conn)
+        if not user or user["role"] != "child":
+            return JSONResponse({"ok": False}, status_code=403)
+        row = conn.execute(
+            "SELECT c.* FROM cards c JOIN decks d ON d.id = c.deck_id "
+            "WHERE c.id = ? AND d.child_id = ?",
+            (card_id, user["id"]),
+        ).fetchone()
+        if not row:
+            return JSONResponse({"ok": False}, status_code=404)
+        is_correct = correct in ("1", "true", "yes")
+        new_box = learn.apply_answer(row["box"], is_correct)
+        conn.execute(
+            "UPDATE cards SET box = ?, due_at = ?, last_result = ?, reviews = reviews + 1 WHERE id = ?",
+            (new_box, learn.next_due(new_box), "correct" if is_correct else "wrong", card_id),
+        )
+    return JSONResponse({"ok": True, "box": new_box})
+
+
+# ---------------------------------------------------------------------------
+# Lernen – Verwaltung (Admin/Eltern)
+# ---------------------------------------------------------------------------
+
+@app.get("/admin/learn", response_class=HTMLResponse)
+def admin_learn(request: Request):
+    with db() as conn:
+        user = current_user(request, conn)
+        if not user or user["role"] != "admin":
+            return RedirectResponse("/", status_code=303)
+        children = conn.execute("SELECT * FROM users WHERE role = 'child' ORDER BY name").fetchall()
+        rows = conn.execute(
+            "SELECT d.*, u.name AS child_name FROM decks d JOIN users u ON u.id = d.child_id "
+            "ORDER BY u.name, d.subject, d.title"
+        ).fetchall()
+        decks = [{"row": d, "stats": _deck_stats(conn, d["id"])} for d in rows]
+    return templates.TemplateResponse(
+        "admin_learn.html",
+        {"request": request, "user": user, "children": children, "decks": decks,
+         "flash": pop_flash(request)},
+    )
+
+
+@app.post("/admin/learn/deck/add")
+def admin_deck_add(
+    request: Request, title: str = Form(...), subject: str = Form(...), child_id: int = Form(...)
+):
+    with db() as conn:
+        user = current_user(request, conn)
+        if not user or user["role"] != "admin":
+            return RedirectResponse("/", status_code=303)
+        cur = conn.execute(
+            "INSERT INTO decks(title, subject, child_id, created_by) VALUES(?,?,?,?)",
+            (title.strip(), subject.strip(), child_id, user["id"]),
+        )
+        new_id = cur.lastrowid
+    flash(request, "Karteikasten angelegt. ✅")
+    return RedirectResponse(f"/admin/learn/deck/{new_id}", status_code=303)
+
+
+@app.get("/admin/learn/deck/{deck_id}", response_class=HTMLResponse)
+def admin_deck(request: Request, deck_id: int):
+    with db() as conn:
+        user = current_user(request, conn)
+        if not user or user["role"] != "admin":
+            return RedirectResponse("/", status_code=303)
+        deck = conn.execute(
+            "SELECT d.*, u.name AS child_name FROM decks d JOIN users u ON u.id = d.child_id "
+            "WHERE d.id = ?", (deck_id,)
+        ).fetchone()
+        if not deck:
+            flash(request, "Karteikasten nicht gefunden.", "err")
+            return RedirectResponse("/admin/learn", status_code=303)
+        cards = conn.execute(
+            "SELECT * FROM cards WHERE deck_id = ? ORDER BY id", (deck_id,)
+        ).fetchall()
+    return templates.TemplateResponse(
+        "admin_deck.html",
+        {"request": request, "user": user, "deck": deck, "cards": cards,
+         "flash": pop_flash(request)},
+    )
+
+
+@app.post("/admin/learn/deck/{deck_id}/cards/add")
+def admin_cards_add(
+    request: Request, deck_id: int,
+    front: str = Form(""), back: str = Form(""), bulk: str = Form(""),
+):
+    with db() as conn:
+        user = current_user(request, conn)
+        if not user or user["role"] != "admin":
+            return RedirectResponse("/", status_code=303)
+        deck = conn.execute("SELECT id FROM decks WHERE id = ?", (deck_id,)).fetchone()
+        if not deck:
+            return RedirectResponse("/admin/learn", status_code=303)
+        added = 0
+        pairs = learn.parse_bulk(bulk)
+        if front.strip() and back.strip():
+            pairs.append((front.strip(), back.strip()))
+        for f, b in pairs:
+            conn.execute("INSERT INTO cards(deck_id, front, back) VALUES(?,?,?)", (deck_id, f, b))
+            added += 1
+    flash(request, f"{added} Karte(n) hinzugefügt. ✅" if added else "Nichts erkannt – Format prüfen.",
+          "ok" if added else "err")
+    return RedirectResponse(f"/admin/learn/deck/{deck_id}", status_code=303)
+
+
+@app.post("/admin/learn/card/{card_id}/delete")
+def admin_card_delete(request: Request, card_id: int, deck_id: int = Form(...)):
+    with db() as conn:
+        user = current_user(request, conn)
+        if not user or user["role"] != "admin":
+            return RedirectResponse("/", status_code=303)
+        conn.execute("DELETE FROM cards WHERE id = ?", (card_id,))
+    return RedirectResponse(f"/admin/learn/deck/{deck_id}", status_code=303)
+
+
+@app.post("/admin/learn/deck/{deck_id}/delete")
+def admin_deck_delete(request: Request, deck_id: int):
+    with db() as conn:
+        user = current_user(request, conn)
+        if not user or user["role"] != "admin":
+            return RedirectResponse("/", status_code=303)
+        conn.execute("DELETE FROM cards WHERE deck_id = ?", (deck_id,))
+        conn.execute("DELETE FROM decks WHERE id = ?", (deck_id,))
+    flash(request, "Karteikasten gelöscht.")
+    return RedirectResponse("/admin/learn", status_code=303)
