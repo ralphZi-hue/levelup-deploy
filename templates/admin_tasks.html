@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block title %}Aufgaben · LevelUp{% endblock %}
+{% block content %}
+
+<h1>Aufgaben</h1>
+<p class="hint">Hausaufgaben, Projekte oder Haushaltsaufgaben mit Frist und Belohnung/Abzug.</p>
+
+<section class="panel">
+  <h2>Neue Aufgabe</h2>
+  <form method="post" action="/admin/tasks/add" class="book-form">
+    <label>Kind
+      <select name="child_id" required>
+        {% for c in children %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}
+      </select>
+    </label>
+    <label class="wide">Titel <input name="title" required placeholder="z.B. Matheaufgaben Seite 12"></label>
+    <label>Kategorie
+      <select name="category">
+        <option value="schule">📚 Schule</option>
+        <option value="haushalt">🏠 Haushalt</option>
+        <option value="verhalten">⭐ Verhalten</option>
+      </select>
+    </label>
+    <label>Betrag € <input name="amount" required placeholder="0,50 oder -1"></label>
+    <label>Frist (optional) <input type="date" name="deadline"></label>
+    <label>Beweisfoto?
+      <select name="requires_proof">
+        <option value="0">nein</option>
+        <option value="1">ja</option>
+      </select>
+    </label>
+    <label class="wide">Notiz (optional) <input name="note" placeholder="z.B. Details zur Aufgabe"></label>
+    <button type="submit">Aufgabe erstellen</button>
+  </form>
+</section>
+
+<section class="panel">
+  <h2>Alle Aufgaben</h2>
+  <table class="rules-table">
+    <thead><tr><th>Kind</th><th>Titel</th><th>Frist</th><th>Betrag</th><th>Foto</th><th>Status</th><th></th></tr></thead>
+    <tbody>
+      {% for a in assignments %}
+        {% set overdue = a.deadline and a.deadline < today and a.status == 'open' %}
+        <tr class="{{ 'inactive' if a.status in ('approved','rejected') else '' }}">
+          <td>{{ a.child_name }}</td>
+          <td>{{ a.title }}{% if a.note %}<br><span class="hint">{{ a.note }}</span>{% endif %}</td>
+          <td class="{{ 'minus' if overdue else '' }}">{{ a.deadline or '–' }}{% if overdue %} ⚠️{% endif %}</td>
+          <td class="{{ 'plus' if a.amount >= 0 else 'minus' }}">{{ a.amount|euro }}</td>
+          <td>{{ '📷' if a.requires_proof else '–' }}</td>
+          <td>
+            {% if a.status == 'open' %}offen
+            {% elif a.status == 'pending' %}⏳ wartet auf Bestätigung
+            {% elif a.status == 'approved' %}✅ erledigt
+            {% else %}❌ abgelehnt{% endif %}
+            {% if a.status == 'pending' and a.evidence_id %}
+              <br><a class="a-evidence" href="/evidence/{{ a.evidence_id }}">📷 Beweis ansehen</a>
+            {% endif %}
+          </td>
+          <td>
+            {% if a.status == 'open' %}
+              <form method="post" action="/admin/tasks/{{ a.id }}/delete">
+                <button class="btn-small" onclick="return confirm('Aufgabe löschen?');">Löschen</button>
+              </form>
+            {% endif %}
+          </td>
+        </tr>
+      {% else %}
+        <tr><td colspan="7" class="empty">Noch keine Aufgaben.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+
+{% endblock %}

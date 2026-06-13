@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}Aufgabe erledigt · LevelUp{% endblock %}
+{% block content %}
+
+<a class="back" href="/me">← zurück</a>
+
+<div class="claim-head {{ 'plus' if task.amount >= 0 else 'minus' }}">
+  <div class="claim-title">{{ task.title }}</div>
+  <div class="claim-amount">{{ task.amount|euro }}</div>
+</div>
+{% if task.deadline %}<p class="hint">Frist: {{ task.deadline }}</p>{% endif %}
+{% if task.note %}<p class="hint">{{ task.note }}</p>{% endif %}
+
+<form method="post" action="/tasks/{{ task.id }}/complete" enctype="multipart/form-data" data-geo class="claim-form">
+  <input type="hidden" name="lat"><input type="hidden" name="lon">
+  <input type="hidden" name="accuracy"><input type="hidden" name="client_time">
+
+  <label>Foto {% if task.requires_proof %}<span class="req">(erforderlich)</span>{% else %}<span class="opt">(optional)</span>{% endif %}
+    <input type="file" name="photo" accept="image/*" capture="environment"
+           data-preview {{ 'required' if task.requires_proof else '' }}>
+  </label>
+  <img id="photo-preview" alt="Vorschau" style="display:none">
+
+  <div id="geo-status" class="geo-status"></div>
+
+  <label>Notiz (optional)
+    <input name="note" placeholder="z.B. was du gemacht hast">
+  </label>
+
+  <button type="submit">Als erledigt melden</button>
+  <p class="hint">Zeitpunkt und Standort werden automatisch mitgespeichert – als Beweis.</p>
+</form>
+
+<script src="/static/geo.js"></script>
+{% endblock %}
