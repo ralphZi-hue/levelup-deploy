@@ -8,7 +8,7 @@ import os
 from typing import Optional
 
 from fastapi import FastAPI, File, Form, Request, UploadFile
-from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
@@ -17,6 +17,7 @@ import sqlite3
 
 import evidence as ev
 import gamify
+import learn
 from auth import authenticate, session_secret
 from db import BASE_DIR, child_balance, db, get_setting, init_db
 from seed import seed
@@ -36,6 +37,7 @@ def euro(cents: Optional[int]) -> str:
 
 
 templates.env.filters["euro"] = euro
+templates.env.filters["subj_emoji"] = learn.subject_emoji
 
 
 # ---------------------------------------------------------------------------
