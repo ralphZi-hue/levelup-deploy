@@ -37,6 +37,31 @@ Dann im Browser: <http://localhost:8770>
 - **Phase 3b:** Verifizierter Test (Eltern schalten frei, Prüfungsmodus) → Gutschrift bei Bestehen ✅
 - **Phase 4 (nächste):** Auszahlungs-Zyklen, Passwort-Self-Service, Hosting (Domain + HTTPS)
 
+### Phase 4 – Detailplanung (Stand 2026-06-13, noch offen)
+
+**4.1 Lunch Money pro Woche**
+- Neues Feld pro Kind: wöchentlicher Zusatzbetrag, automatisch gutgeschrieben (eigene Transaktion,
+  sichtbar im Verlauf – nicht einfach in base_allowance integriert)
+- Offen: Betrag pro Kind individuell (Admin setzt im UI)
+
+**4.2 Belege/Auslagen einreichen**
+- Kind reicht Foto + freien Betrag + Notiz ein ("Beleg einreichen", eigener Bereich im Dashboard,
+  nicht über die feste Regel-Liste)
+- Landet als pending Transaktion (Kategorie "Auslagen") im Admin-Bereich mit Foto zur Prüfung
+- Bei Genehmigung: Gutschrift, Beleg als "erledigt" markiert
+- Offen: Können Eltern den Betrag vor Genehmigung noch anpassen (z.B. Trinkgeld nicht erstattet)?
+
+**4.3 Wissenstest mit Eltern-Live-Bewertung** (ersetzt/erweitert 3b)
+- Fortschrittsbalken im Kind-Dashboard: Beherrschungsgrad pro Karteikasten (Metrik offen –
+  Anteil Fach 4-5 vs. Ø Fach/5), Motivationstexte bei Annäherung an Schwelle
+- Bei Erreichen der Schwelle: Kind kann Test "beantragen" (statt bisher: Eltern schalten frei ohne Antrag)
+- Begleiteter Test: Kind tippt Antworten (wie bisher), aber KEINE Auto-Korrektur mehr
+- Eltern sehen live (Polling) Frage+Antwort des Kindes parallel und bewerten jede Antwort:
+  Falsch / 25% / 50% / 75% / Richtig (nur Eltern-Eingabe)
+- Endergebnis = Ø der Eltern-Bewertungen → bestanden: Gutschrift, nicht bestanden: **Abzug**
+- Offen: Höhe des Abzugs bei Nichtbestehen (symmetrisch zur Belohnung? fester Betrag? pro Test wählbar?)
+- Offen: genaue Mastery-Schwelle/Metrik (s.o.)
+
 ### Lernen (Phase 3a)
 Eltern legen pro Kind & Fach Karteikästen an (`/admin/learn`) und füllen Karten einzeln oder per
 Bulk-Import (Trenner `=`, `-`, `;`, `|`, Tab). Kinder üben unter `/learn` mit dem **Leitner-System**
