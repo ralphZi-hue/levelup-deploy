@@ -31,8 +31,15 @@ Dann im Browser: <http://localhost:8770>
 ## Phasen-Roadmap
 - **Phase 1:** Konto + Regelwerk + Genehmigungs-Workflow + Dashboards ✅
 - **Phase 2:** Foto-Beweise (Live-Kamera, Server-Zeitstempel, Geodaten/EXIF) ✅
-- **Phase 3 (nächste):** Lernprogramm – Leitner-Karteikasten + verifizierter Test (Eltern-PIN, Prüfungsmodus)
+- **Phase 3a:** Leitner-Karteikasten + freies Üben ✅
+- **Phase 3b (nächste):** Verifizierter Test (Eltern-PIN, Prüfungsmodus) → Gutschrift bei Bestehen
 - **Phase 4:** Auszahlungs-Zyklen, Passwort-Self-Service, Hosting (Domain + HTTPS)
+
+### Lernen (Phase 3a)
+Eltern legen pro Kind & Fach Karteikästen an (`/admin/learn`) und füllen Karten einzeln oder per
+Bulk-Import (Trenner `=`, `-`, `;`, `|`, Tab). Kinder üben unter `/learn` mit dem **Leitner-System**
+(5 Fächer, Abstände 0/1/3/7/14 Tage). Freies Üben gibt **kein** Geld – das kommt erst über den
+eltern-überwachten Test in Phase 3b (Schutz gegen KI-Schummeln).
 
 ### Hinweis zu „fälschungssicher" (Phase 2)
 Die **Server-Zeit** eines Beweisfotos ist verlässlich (der Server setzt sie). Geräte-Zeit und
@@ -45,6 +52,7 @@ kryptografische Garantie – das wäre nur mit einer nativen App + Hardware-Atte
 - `rules` – Regelkatalog (Titel, Kategorie, Betrag ±, Beweis nötig)
 - `transactions` – Buchungen (Ledger), Status `pending`/`approved`/`rejected`
 - `evidence` – Beweisfotos zu Buchungen (Datei, Server-/Geräte-Zeit, Geo, EXIF)
+- `decks` / `cards` – Karteikästen pro Kind & Fach + Leitner-Karten (Fach 1–5, Fälligkeit)
 - `settings` – Konfiguration (z.B. Auszahlungstag)
 
 Beweisfotos liegen unter `data/uploads/` (gitignored) und werden nur über die geschützte
