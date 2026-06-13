@@ -73,8 +73,26 @@ CREATE TABLE IF NOT EXISTS settings (
     value TEXT
 );
 
+CREATE TABLE IF NOT EXISTS evidence (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    tx_id         INTEGER NOT NULL REFERENCES transactions(id) ON DELETE CASCADE,
+    filename      TEXT    NOT NULL,            -- zufälliger Dateiname in data/uploads/
+    mime          TEXT,
+    size          INTEGER,
+    gps_lat       REAL,                        -- Browser-Geolocation (zuverlässigste Quelle)
+    gps_lon       REAL,
+    gps_accuracy  REAL,                        -- Genauigkeit in Metern
+    exif_lat      REAL,                        -- aus dem Bild ausgelesen (best effort)
+    exif_lon      REAL,
+    exif_time     TEXT,                        -- DateTimeOriginal aus dem Bild
+    client_time   TEXT,                        -- Zeit laut Gerät (manipulierbar)
+    server_time   TEXT    NOT NULL DEFAULT (datetime('now')),  -- fälschungssicher (Server setzt sie)
+    uploaded_by   INTEGER NOT NULL REFERENCES users(id)
+);
+
 CREATE INDEX IF NOT EXISTS idx_tx_child  ON transactions(child_id);
 CREATE INDEX IF NOT EXISTS idx_tx_status ON transactions(status);
+CREATE INDEX IF NOT EXISTS idx_ev_tx     ON evidence(tx_id);
 """
 
 
