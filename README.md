@@ -90,6 +90,13 @@ Antworten im **Prüfungsmodus** mit Countdown ein; die Lösungen liegen **nie im
 server-seitig in `learn.check_answer`) – Schutz gegen Schummeln per KI oder Quelltext. Ab der
 Trefferquote (Standard 80 %) gibt es automatisch eine Gutschrift, markiert als „✅ verifiziert".
 
+### Benutzerverwaltung & Einladungen
+Unter `/admin/users` können Admins neue Benutzer (Kind oder Admin) per E-Mail einladen. Admin gibt
+Name, Benutzername, E-Mail, Rolle und (bei Kindern) Grund-Taschengeld vor; der Versand erfolgt per
+SMTP (Zugangsdaten, z.B. Gmail-App-Passwort, werden auf derselben Seite hinterlegt). Die eingeladene
+Person öffnet den Link `/register/{token}` und legt nur ihr eigenes Passwort fest – Name/Benutzername
+sind vorgegeben. Einladungen sind einmalig nutzbar, können erneut versendet oder zurückgezogen werden.
+
 ### Hinweis zu „fälschungssicher" (Phase 2)
 Die **Server-Zeit** eines Beweisfotos ist verlässlich (der Server setzt sie). Geräte-Zeit und
 Browser-/EXIF-Standort werden zusätzlich gespeichert, sind aber technisch theoretisch manipulierbar
