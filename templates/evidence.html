@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}Beweis · FamBank{% endblock %}
+{% block content %}
+
+<a class="back" href="{{ '/admin' if user.role == 'admin' else '/me' }}">← zurück</a>
+
+<h1>Beweisfoto</h1>
+{% if tx %}
+  <p class="hint">
+    <strong>{{ tx.title }}</strong> · {{ tx.child_name }} ·
+    <span class="{{ 'plus' if tx.amount >= 0 else 'minus' }}">{{ tx.amount|euro }}</span> ·
+    {% if tx.status == 'pending' %}⏳ wartet{% elif tx.status == 'approved' %}✅ bestätigt{% else %}❌ abgelehnt{% endif %}
+  </p>
+{% endif %}
+
+<img class="evidence-img" src="/evidence/{{ ev.id }}/image" alt="Beweisfoto">
+
+<section class="panel">
+  <h2>Metadaten</h2>
+  <table class="meta-table">
+    <tr><th>🕐 Hochgeladen (Server)</th><td>{{ ev.server_time }} <span class="trust">fälschungssicher</span></td></tr>
+    {% if ev.client_time %}<tr><th>📱 Geräte-Zeit</th><td>{{ ev.client_time }} <span class="hint-inline">nur Hinweis</span></td></tr>{% endif %}
+    {% if ev.gps_lat is not none and ev.gps_lon is not none %}
+      <tr><th>📍 Standort (Gerät)</th>
+        <td>
+          {{ '%.5f'|format(ev.gps_lat) }}, {{ '%.5f'|format(ev.gps_lon) }}
+          {% if ev.gps_accuracy %}(±{{ ev.gps_accuracy|int }} m){% endif %}
+          · <a href="https://www.openstreetmap.org/?mlat={{ ev.gps_lat }}&mlon={{ ev.gps_lon }}#map=18/{{ ev.gps_lat }}/{{ ev.gps_lon }}" target="_blank" rel="noopener">Karte</a>
+        </td>
+      </tr>
+    {% else %}
+      <tr><th>📍 Standort (Gerät)</th><td class="muted-cell">nicht erfasst</td></tr>
+    {% endif %}
+    {% if ev.exif_lat is not none and ev.exif_lon is not none %}
+      <tr><th>🖼 Standort (Foto-EXIF)</th><td>{{ '%.5f'|format(ev.exif_lat) }}, {{ '%.5f'|format(ev.exif_lon) }}</td></tr>
+    {% endif %}
+    {% if ev.exif_time %}<tr><th>🖼 Aufnahmezeit (EXIF)</th><td>{{ ev.exif_time }}</td></tr>{% endif %}
+    <tr><th>Datei</th><td>{{ ev.mime }} · {{ (ev.size / 1024)|int }} KB</td></tr>
+  </table>
+  <p class="hint">Hinweis: Die <strong>Server-Zeit</strong> ist die verlässliche Größe. Geräte-Zeit und Standort sind technisch theoretisch manipulierbar – für den Familienalltag aber ein starker Beleg.</p>
+</section>
+
+{% endblock %}

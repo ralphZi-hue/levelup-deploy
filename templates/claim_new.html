@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}Eintragen · FamBank{% endblock %}
+{% block content %}
+
+<a class="back" href="/me">← zurück</a>
+
+<div class="claim-head {{ 'plus' if rule.amount >= 0 else 'minus' }}">
+  <div class="claim-title">{{ rule.title }}</div>
+  <div class="claim-amount">{{ rule.amount|euro }}</div>
+</div>
+
+<form method="post" action="/claim" enctype="multipart/form-data" data-geo class="claim-form">
+  <input type="hidden" name="rule_id" value="{{ rule.id }}">
+  <input type="hidden" name="lat"><input type="hidden" name="lon">
+  <input type="hidden" name="accuracy"><input type="hidden" name="client_time">
+
+  <label>Foto {% if rule.requires_proof %}<span class="req">(erforderlich)</span>{% else %}<span class="opt">(optional)</span>{% endif %}
+    <input type="file" name="photo" accept="image/*" capture="environment"
+           data-preview {{ 'required' if rule.requires_proof else '' }}>
+  </label>
+  <img id="photo-preview" alt="Vorschau" style="display:none">
+
+  <div id="geo-status" class="geo-status"></div>
+
+  <label>Notiz (optional)
+    <input name="note" placeholder="z.B. welches Fach / was gemacht">
+  </label>
+
+  <button type="submit">Antrag senden</button>
+  <p class="hint">Zeitpunkt und Standort werden automatisch mitgespeichert – als Beweis.</p>
+</form>
+
+<script src="/static/geo.js"></script>
+{% endblock %}
