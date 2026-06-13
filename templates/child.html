@@ -2,6 +2,59 @@
 {% block title %}Mein Konto · LevelUp{% endblock %}
 {% block content %}
 
+{% set dinner_active_today = dinner_cfg and dinner_cfg.active and dinner_cfg.date == today %}
+
+{# ===== ABENDESSEN-BANNER (ganz oben) ===== #}
+{% if dinner_active_today %}
+<section class="dinner-hero" id="dinnerSection">
+  <div class="dinner-hero-top">
+    <div class="dinner-hero-title">🍽️ Abendessen heute</div>
+    <div class="dinner-hero-time">{{ dinner_cfg.dinner_time }} Uhr</div>
+  </div>
+  {% if dinner_cfg.menu %}
+  <div class="dinner-hero-menu">{{ dinner_cfg.menu }}</div>
+  {% endif %}
+  <div class="dinner-hero-countdown" id="dinnerCountdown" data-time="{{ dinner_cfg.dinner_time }}"></div>
+
+  <div class="dinner-slots-row">
+    {% for slot in dinner_slots %}
+    {% if slot.active %}
+    {% set claim = dinner_claims_map.get(slot.slot_key) %}
+    {% set is_mine = claim and claim.child_id == user.id %}
+    {% set is_taken = claim and not is_mine %}
+    <div class="dinner-slot-card {{ 'mine' if is_mine else ('taken' if is_taken else 'free') }}">
+      <div class="dsc-name">{{ slot.label }}</div>
+      <div class="dsc-amount">
+        {% if slot.mode == 'plus' %}+{{ slot.amount|euro }}
+        {% elif slot.mode == 'minus' %}−{{ slot.amount|euro }}
+        {% else %}±{{ slot.amount|euro }}{% endif %}
+      </div>
+      {% if is_mine %}
+        <div class="dsc-status">✅ Du bist dabei!</div>
+        {% if not claim.result %}
+        <form method="post" action="/dinner/cancel">
+          <input type="hidden" name="slot_key" value="{{ slot.slot_key }}">
+          <button class="btn btn-small" type="submit" style="background:#eef0f8;color:var(--minus);width:100%;">Abmelden</button>
+        </form>
+        {% else %}
+          <div class="dsc-result">{{ {'done':'✅','late':'⏰','missed':'❌'}.get(claim.result, '') }}</div>
+        {% endif %}
+      {% elif is_taken %}
+        <div class="dsc-taken">{{ claim.child_name }} macht das</div>
+      {% else %}
+        <form method="post" action="/dinner/commit">
+          <input type="hidden" name="slot_key" value="{{ slot.slot_key }}">
+          <button class="btn btn-small btn-ok" type="submit" style="width:100%;">Anmelden</button>
+        </form>
+      {% endif %}
+    </div>
+    {% endif %}
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
+{# ===== HERO ===== #}
 {% set trend_labels = {
   'up2':'🚀 stark dabei', 'up':'▲ im Plus', 'flat':'• ruhig',
   'down':'▼ im Minus', 'down2':'⚠️ verloren'
@@ -80,19 +133,70 @@
 <h2>Was möchtest du eintragen?</h2>
 <p class="hint">Such dir aus, was du gemacht hast. Mama oder Papa bestätigen es dann.</p>
 
+{# ===== REGELN: Überraschung zuerst, dann normal nach Kategorie ===== #}
+{% set surprise_rules = rules | selectattr('is_surprise', 'equalto', 1) | selectattr('active', 'equalto', 1) | list %}
+{% if surprise_rules %}
+<div class="cat">
+  <h3>❓ Überraschungsaufgaben</h3>
+  <div class="rule-grid">
+    {% for r in surprise_rules %}
+      {% set uses = rule_uses.get(r.id, 0) %}
+      {% set remaining = (r.max_uses - uses) if r.max_uses else None %}
+      {% set exhausted = remaining is not none and remaining <= 0 %}
+      <div class="rule-card surprise-card {{ 'plus' if r.amount >= 0 else 'minus' }} {{ 'exhausted' if exhausted }}"
+           id="sur-{{ r.id }}">
+        <div class="sur-mystery-face">
+          <div class="sur-big-q">❓</div>
+          <div class="rule-title" style="color:var(--muted);">Überraschung</div>
+          {% if remaining is not none %}
+          <div class="rule-proof">Noch {{ remaining }}× möglich</div>
+          {% endif %}
+          {% if not exhausted %}
+          <button class="btn btn-small" style="margin-top:auto;"
+            onclick="flipSurprise({{ r.id }}, event)">Aufdecken</button>
+          {% else %}
+          <div class="rule-proof" style="color:var(--minus);">Limit erreicht</div>
+          {% endif %}
+        </div>
+        <div class="sur-reveal-face" id="sur-rev-{{ r.id }}" style="display:none;flex-direction:column;gap:6px;">
+          <div class="rule-title">{{ r.title }}</div>
+          <div class="rule-amount {{ 'plus' if r.amount >= 0 else 'minus' }}">{{ r.amount|euro }}</div>
+          {% if r.requires_proof %}<div class="rule-proof">📷 Foto nötig</div>{% endif %}
+          <div class="sur-timer-bar"><div class="sur-timer-fill" id="suf-{{ r.id }}"></div></div>
+          <div class="sur-timer-text">⏱ <span id="sut-{{ r.id }}">30</span>s</div>
+          <a class="btn btn-ok" href="/claim/new?rule_id={{ r.id }}"
+             onclick="clearSurTimer({{ r.id }})">Annehmen →</a>
+          <button class="btn btn-small" style="background:#eef0f8;color:var(--ink);"
+            onclick="flipBack({{ r.id }}, event)">Ablehnen</button>
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
 {% set cats = {'schule':'📚 Schule', 'haushalt':'🏠 Haushalt', 'verhalten':'⭐ Verhalten'} %}
 {% for key, label in cats.items() %}
-  {% set items = rules | selectattr('category','equalto',key) | list %}
+  {% set items = rules | selectattr('category','equalto',key) | selectattr('is_surprise','equalto',0) | list %}
   {% if items %}
   <div class="cat">
     <h3>{{ label }}</h3>
     <div class="rule-grid">
       {% for r in items %}
-        <a href="/claim/new?rule_id={{ r.id }}" class="rule-card {{ 'plus' if r.amount >= 0 else 'minus' }}">
+        {% set uses = rule_uses.get(r.id, 0) %}
+        {% set remaining = (r.max_uses - uses) if r.max_uses else None %}
+        {% set exhausted = remaining is not none and remaining <= 0 %}
+        <a href="{{ '/claim/new?rule_id=' ~ r.id if not exhausted else '#' }}"
+           class="rule-card {{ 'plus' if r.amount >= 0 else 'minus' }} {{ 'exhausted' if exhausted }}">
           <div class="rule-title">{{ r.title }}</div>
           <div class="rule-amount">{{ r.amount|euro }}</div>
           {% if r.requires_proof %}<div class="rule-proof">📷 Foto nötig</div>{% endif %}
-          <span class="rule-go">Eintragen →</span>
+          {% if remaining is not none %}
+          <div class="rule-proof {{ 'exhausted-label' if exhausted }}">
+            {{ 'Limit erreicht' if exhausted else 'Noch ' ~ remaining ~ '× möglich' }}
+          </div>
+          {% endif %}
+          {% if not exhausted %}<span class="rule-go">Eintragen →</span>{% endif %}
         </a>
       {% endfor %}
     </div>
@@ -118,4 +222,5 @@
 </div>
 
 <script src="/static/gamify.js"></script>
+<script src="/static/dinner.js"></script>
 {% endblock %}

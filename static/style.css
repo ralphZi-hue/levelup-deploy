@@ -398,6 +398,124 @@ body.role-child .rule-card:active { transform: scale(.97); }
 }
 
 /* ====================================================================== */
+/* Regel-Badges (Modus + Limit)                                           */
+/* ====================================================================== */
+.mode-badge {
+  display: inline-block; padding: 1px 7px; border-radius: 999px;
+  font-size: 12px; font-weight: 700;
+}
+.mode-plus  { background: #e9f9ef; color: var(--plus); }
+.mode-minus { background: #fdecec; color: var(--minus); }
+.mode-both  { background: #f1f0ff; color: var(--brand); }
+
+.rule-card.exhausted { opacity: .45; pointer-events: none; }
+.exhausted-label { color: var(--minus) !important; }
+
+/* ====================================================================== */
+/* Surprise Cards                                                          */
+/* ====================================================================== */
+.surprise-card {
+  cursor: default;
+  min-height: 160px;
+  transition: transform .22s ease, opacity .22s ease;
+  overflow: hidden;
+}
+.surprise-card.sur-flipping { transform: scaleX(0); opacity: .3; }
+
+.sur-mystery-face {
+  display: flex; flex-direction: column; align-items: center;
+  justify-content: center; gap: 6px; height: 100%;
+}
+.sur-big-q { font-size: 40px; line-height: 1; }
+
+.sur-reveal-face { height: 100%; }
+
+.sur-timer-bar {
+  height: 6px; background: var(--line); border-radius: 999px; overflow: hidden; margin-top: 4px;
+}
+.sur-timer-fill {
+  height: 100%; background: linear-gradient(90deg, var(--brand), #8b5cf6);
+  border-radius: 999px; transition: width 1s linear;
+}
+.sur-timer-text { font-size: 12px; color: var(--muted); }
+
+/* ====================================================================== */
+/* Abendessen – Kind-Dashboard                                             */
+/* ====================================================================== */
+.dinner-hero {
+  background: linear-gradient(135deg, #f97316 0%, #ef4444 100%);
+  color: #fff; border-radius: var(--radius); padding: 18px 20px 20px;
+  box-shadow: var(--shadow); margin-bottom: 16px;
+}
+.dinner-hero-top {
+  display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;
+}
+.dinner-hero-title { font-weight: 700; font-size: 16px; }
+.dinner-hero-time  { font-size: 15px; font-weight: 800; }
+.dinner-hero-menu  { font-size: 14px; opacity: .9; margin-bottom: 6px; }
+.dinner-hero-countdown {
+  font-size: 13px; font-weight: 700; opacity: .95; margin-bottom: 14px; min-height: 18px;
+}
+.dinner-hero-countdown.now { font-size: 15px; }
+
+.dinner-slots-row {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px;
+}
+.dinner-slot-card {
+  background: rgba(255,255,255,.15); border-radius: 14px;
+  padding: 12px 10px; display: flex; flex-direction: column; gap: 6px;
+  border: 1px solid rgba(255,255,255,.25);
+}
+.dinner-slot-card.mine    { background: rgba(255,255,255,.28); border-color: rgba(255,255,255,.6); }
+.dinner-slot-card.taken   { opacity: .65; }
+.dsc-name   { font-weight: 700; font-size: 13px; }
+.dsc-amount { font-size: 12px; opacity: .85; font-weight: 600; }
+.dsc-status { font-size: 12px; font-weight: 700; }
+.dsc-taken  { font-size: 12px; opacity: .75; }
+.dsc-result { font-size: 18px; text-align: center; }
+
+/* ====================================================================== */
+/* Abendessen – Admin                                                      */
+/* ====================================================================== */
+.dinner-admin-panel { }
+
+.dinner-slot-configs { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+.dsc-row {
+  display: grid; grid-template-columns: 1fr 72px 1fr;
+  align-items: center; gap: 8px;
+}
+.dsc-row input, .dsc-row select { margin: 0; padding: 8px 10px; font-size: 13px; }
+
+.dinner-admin-meta {
+  font-size: 14px; font-weight: 600; margin-bottom: 10px; display: flex; align-items: center; gap: 10px;
+  flex-wrap: wrap;
+}
+.dinner-admin-countdown { color: var(--brand); font-weight: 700; }
+
+.dinner-admin-slots {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px;
+}
+.dinner-admin-slot {
+  background: #f8f9ff; border: 1px solid var(--line); border-radius: 14px;
+  padding: 12px; display: flex; flex-direction: column; gap: 6px;
+}
+.dinner-admin-slot.claimed { border-color: var(--brand); }
+.dinner-admin-slot.free { opacity: .75; }
+.das-label  { font-weight: 700; font-size: 14px; }
+.das-mode   { font-size: 13px; font-weight: 600; }
+.das-mode.mode-plus  { color: var(--plus); }
+.das-mode.mode-minus { color: var(--minus); }
+.das-mode.mode-both  { color: var(--brand); }
+.das-who    { font-size: 13px; color: var(--muted); font-weight: 600; }
+.das-free   { font-size: 12px; color: var(--muted); }
+.das-settled { font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 6px; }
+
+.settle-form { display: flex; gap: 6px; margin-top: 2px; }
+.settle-btn  { flex: 1; padding: 7px 4px; font-size: 16px; }
+.warn-btn    { background: #fff7ed; color: #b45309; border: 1px solid #fed7aa; }
+.warn-btn:hover { background: #ffedd5; }
+
+/* ====================================================================== */
 /* Taschengeldkonto & Auszahlungs-Dialog                                  */
 /* ====================================================================== */
 

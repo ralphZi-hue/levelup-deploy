@@ -4,6 +4,98 @@
 
 <h1>Übersicht</h1>
 
+<!-- ===== ABENDESSEN ===== -->
+{% set dinner_active_today = dinner_cfg and dinner_cfg.active and dinner_cfg.date == today %}
+<section class="panel dinner-admin-panel">
+  <h2>🍽️ Abendessen</h2>
+
+  <details {{ 'open' if not dinner_active_today else '' }}>
+    <summary style="cursor:pointer;font-weight:600;font-size:14px;color:var(--muted);">Einstellungen</summary>
+    <form method="post" action="/admin/dinner/config" style="margin-top:12px;">
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
+        <label style="display:flex;align-items:center;gap:8px;font-size:14px;color:var(--ink);font-weight:600;">
+          <input type="checkbox" name="active" value="1"
+            {{ 'checked' if dinner_cfg and dinner_cfg.active else '' }}
+            style="width:auto;margin:0;accent-color:var(--brand);">
+          Heute geplant
+        </label>
+        <label style="font-size:13px;">Uhrzeit
+          <input type="time" name="dinner_time"
+            value="{{ dinner_cfg.dinner_time if dinner_cfg and dinner_cfg.dinner_time else '' }}"
+            style="width:120px;">
+        </label>
+      </div>
+      <label style="font-size:13px;" class="wide">Menü
+        <input name="menu" placeholder="z.B. Spaghetti Bolognese"
+          value="{{ dinner_cfg.menu if dinner_cfg and dinner_cfg.menu else '' }}">
+      </label>
+      <div class="dinner-slot-configs">
+        {% for slot in dinner_slots %}
+        <div class="dsc-row">
+          <label style="display:flex;align-items:center;gap:6px;margin:0;font-size:13px;font-weight:600;color:var(--ink);">
+            <input type="checkbox" name="slot_{{ slot.slot_key }}_active" value="1"
+              {{ 'checked' if slot.active else '' }}
+              style="width:auto;margin:0;accent-color:var(--brand);">
+            {{ slot.label }}
+          </label>
+          <input type="text" name="slot_{{ slot.slot_key }}_amount"
+            value="{{ '%.2f'|format(slot.amount/100)|replace('.', ',') }}"
+            placeholder="€" style="width:72px;">
+          <select name="slot_{{ slot.slot_key }}_mode" style="flex:1;">
+            <option value="plus" {{ 'selected' if slot.mode=='plus' }}>+ Belohnung</option>
+            <option value="minus" {{ 'selected' if slot.mode=='minus' }}>− Abzug</option>
+            <option value="both" {{ 'selected' if slot.mode=='both' }}>+/− beides</option>
+          </select>
+        </div>
+        {% endfor %}
+      </div>
+      <button type="submit" class="btn btn-small" style="margin-top:10px;">Speichern</button>
+    </form>
+  </details>
+
+  {% if dinner_active_today %}
+  <div class="dinner-admin-overview" style="margin-top:14px;">
+    <div class="dinner-admin-meta">
+      <strong>{{ dinner_cfg.dinner_time }} Uhr</strong>
+      {% if dinner_cfg.menu %} · {{ dinner_cfg.menu }}{% endif %}
+      <span class="dinner-admin-countdown" id="adminDinnerCountdown"
+        data-time="{{ dinner_cfg.dinner_time }}"></span>
+    </div>
+    <div class="dinner-admin-slots">
+      {% for slot in dinner_slots %}
+      {% if slot.active %}
+      {% set claim = dinner_claims_map.get(slot.slot_key) %}
+      <div class="dinner-admin-slot {{ 'claimed' if claim else 'free' }}">
+        <div class="das-label">{{ slot.label }}</div>
+        <div class="das-mode mode-{{ slot.mode }}">
+          {{ {'plus':'+','minus':'−','both':'±'}.get(slot.mode,'±') }} {{ slot.amount|euro }}
+        </div>
+        {% if claim %}
+          <div class="das-who">{{ claim.child_name }}</div>
+          {% if claim.result %}
+            <div class="das-settled">
+              {{ {'done':'✅ erledigt','late':'⏰ verspätet','missed':'❌ nicht erledigt'}.get(claim.result, claim.result) }}
+              {% if claim.tx_id %}<span class="trust">gebucht</span>{% endif %}
+            </div>
+          {% else %}
+            <form method="post" action="/admin/dinner/{{ claim.id }}/settle" class="settle-form">
+              <button name="result" value="done" class="btn-ok settle-btn">✅</button>
+              <button name="result" value="late" class="settle-btn warn-btn">⏰</button>
+              <button name="result" value="missed" class="btn-no settle-btn">❌</button>
+            </form>
+          {% endif %}
+        {% else %}
+          <span class="das-free">Frei</span>
+        {% endif %}
+      </div>
+      {% endif %}
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+</section>
+
+<!-- ===== KINDER-SALDEN ===== -->
 <div class="kid-cards">
   {% for k in kids %}
     <div class="kid-card">
@@ -49,7 +141,7 @@
   {% endfor %}
 </div>
 
-<!-- ===== Auszahlungs-Dialoge (einer pro Kind) ===== -->
+<!-- ===== Auszahlungs-Dialoge ===== -->
 {% for k in kids %}
 <dialog id="payout-modal-{{ k.row.id }}" class="payout-dialog">
   <h3 style="margin-top:0;">Auszahlung · {{ k.row.name }}</h3>
@@ -69,7 +161,6 @@
     </label>
   </div>
 
-  <!-- Bank-Bereich -->
   <div id="bank-sec-{{ k.row.id }}" class="payout-sec">
     <div class="copy-row">
       <span class="copy-label">Betrag</span>
@@ -93,15 +184,13 @@
     </div>
   </div>
 
-  <!-- Taschengeldkonto-Bereich -->
   <div id="pocket-sec-{{ k.row.id }}" class="payout-sec" hidden>
     <p style="font-size:14px;color:var(--muted);margin:0;">
       {{ k.balance|euro }} werden auf das Taschengeldkonto von <strong>{{ k.row.name }}</strong>
-      gebucht. Der App-Saldo wird auf 0 gesetzt.
+      gebucht. App-Saldo → 0.
     </p>
     <p style="font-size:13px;color:var(--muted);margin:6px 0 0;">
-      Aktueller TG-Konto-Stand: {{ k.pocket|euro }}
-      → danach: {{ (k.pocket + k.balance)|euro }}
+      TG-Konto jetzt: {{ k.pocket|euro }} → {{ (k.pocket + k.balance)|euro }}
     </p>
   </div>
 
@@ -119,9 +208,7 @@
   </form>
 
   {% else %}
-  <p style="color:var(--muted);font-size:14px;">
-    Saldo ist 0 oder negativ – keine Auszahlung möglich.
-  </p>
+  <p style="color:var(--muted);font-size:14px;">Saldo ist 0 oder negativ.</p>
   <div class="dialog-btns">
     <button type="button" class="btn btn-small"
       onclick="document.getElementById('payout-modal-{{ k.row.id }}').close()">Schließen</button>
@@ -130,6 +217,7 @@
 </dialog>
 {% endfor %}
 
+<!-- ===== BESTÄTIGUNGEN ===== -->
 <section class="panel">
   <h2>Wartet auf Bestätigung {% if pending %}<span class="badge">{{ pending|length }}</span>{% endif %}</h2>
   {% if pending %}
@@ -157,7 +245,7 @@
 
 <section class="panel">
   <h2>Direkt buchen</h2>
-  <p class="hint">Sofort gültig – z.B. ein Vergehen erfassen oder eine Belohnung gutschreiben. Optional mit Beweisfoto + Standort.</p>
+  <p class="hint">Sofort gültig – z.B. ein Vergehen erfassen oder eine Belohnung gutschreiben.</p>
   <form method="post" action="/admin/book" enctype="multipart/form-data" data-geo class="book-form">
     <input type="hidden" name="lat"><input type="hidden" name="lon">
     <input type="hidden" name="accuracy"><input type="hidden" name="client_time">
@@ -187,6 +275,7 @@
 </section>
 
 <script src="/static/geo.js"></script>
+<script src="/static/dinner.js"></script>
 <script>
 function openPayoutModal(id) {
   document.getElementById('payout-modal-' + id).showModal();

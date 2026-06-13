@@ -3,7 +3,7 @@
 {% block content %}
 
 <h1>Regelwerk</h1>
-<p class="hint">Diese Liste sehen auch die Kinder. Positive Beträge = Gutschrift, negative = Belastung.</p>
+<p class="hint">Positive Beträge = Gutschrift, negative = Belastung.</p>
 
 <section class="panel">
   <h2>Neue Regel</h2>
@@ -17,27 +17,57 @@
       </select>
     </label>
     <label>Betrag € <input name="amount" required placeholder="0,50 oder -1"></label>
+    <label>Modus
+      <select name="amount_mode">
+        <option value="both">+/− frei</option>
+        <option value="plus">+ nur Belohnung</option>
+        <option value="minus">− nur Abzug</option>
+      </select>
+    </label>
     <label>Beweisfoto?
       <select name="requires_proof">
         <option value="0">nein</option>
-        <option value="1">ja (Phase 2)</option>
+        <option value="1">ja</option>
       </select>
     </label>
-    <button type="submit">Hinzufügen</button>
+    <label>Überraschungsaufgabe?
+      <select name="is_surprise">
+        <option value="0">nein</option>
+        <option value="1">ja ❓</option>
+      </select>
+    </label>
+    <label>Max. Nutzungen <input name="max_uses" placeholder="z.B. 3 (leer = unbegrenzt)" style=""></label>
+    <label>Pro Zeitraum
+      <select name="period">
+        <option value="">— unbegrenzt —</option>
+        <option value="day">pro Tag</option>
+        <option value="week">pro Woche</option>
+        <option value="month">pro Monat</option>
+      </select>
+    </label>
+    <button type="submit" class="wide">Hinzufügen</button>
   </form>
 </section>
 
 <section class="panel">
   <h2>Alle Regeln</h2>
   <table class="rules-table">
-    <thead><tr><th>Titel</th><th>Kategorie</th><th>Betrag</th><th>Foto</th><th>Status</th><th></th></tr></thead>
+    <thead>
+      <tr>
+        <th>Titel</th><th>Kat.</th><th>Betrag</th><th>Modus</th>
+        <th>Limit</th><th>Foto</th><th>❓</th><th>Status</th><th></th>
+      </tr>
+    </thead>
     <tbody>
       {% for r in rules %}
         <tr class="{{ '' if r.active else 'inactive' }}">
           <td>{{ r.title }}</td>
           <td>{{ r.category }}</td>
           <td class="{{ 'plus' if r.amount >= 0 else 'minus' }}">{{ r.amount|euro }}</td>
+          <td><span class="mode-badge mode-{{ r.amount_mode }}">{{ {'plus':'+','minus':'−','both':'±'}.get(r.amount_mode, '±') }}</span></td>
+          <td>{% if r.max_uses %}{{ r.max_uses }}×/{{ {'day':'Tag','week':'Wo','month':'Mo'}.get(r.period,'?') }}{% else %}–{% endif %}</td>
           <td>{{ '📷' if r.requires_proof else '–' }}</td>
+          <td>{{ '❓' if r.is_surprise else '–' }}</td>
           <td>{{ 'aktiv' if r.active else 'inaktiv' }}</td>
           <td>
             <form method="post" action="/admin/rules/{{ r.id }}/toggle">

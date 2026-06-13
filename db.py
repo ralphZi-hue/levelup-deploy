@@ -232,6 +232,10 @@ MIGRATIONS = [
     ("users", "cash_legacy", "ALTER TABLE users ADD COLUMN cash_legacy INTEGER NOT NULL DEFAULT 0"),
     ("users", "email", "ALTER TABLE users ADD COLUMN email TEXT"),
     ("users", "iban", "ALTER TABLE users ADD COLUMN iban TEXT"),
+    ("rules", "max_uses", "ALTER TABLE rules ADD COLUMN max_uses INTEGER"),
+    ("rules", "period", "ALTER TABLE rules ADD COLUMN period TEXT"),
+    ("rules", "amount_mode", "ALTER TABLE rules ADD COLUMN amount_mode TEXT NOT NULL DEFAULT 'both'"),
+    ("rules", "is_surprise", "ALTER TABLE rules ADD COLUMN is_surprise INTEGER NOT NULL DEFAULT 0"),
 ]
 
 
@@ -261,6 +265,23 @@ def child_balance(conn: sqlite3.Connection, child_id: int) -> int:
         (child_id,),
     ).fetchone()["s"]
     return base + s
+
+
+def rule_uses_this_period(conn: sqlite3.Connection, child_id: int, rule_id: int, period: str) -> int:
+    """Anzahl genehmigter/ausstehender Nutzungen einer Regel in der aktuellen Periode."""
+    if period == "day":
+        where = "AND date(t.created_at) = date('now')"
+    elif period == "week":
+        where = "AND t.created_at >= datetime('now', '-6 days')"
+    elif period == "month":
+        where = "AND strftime('%Y-%m', t.created_at) = strftime('%Y-%m', 'now')"
+    else:
+        return 0
+    return conn.execute(
+        f"SELECT COUNT(*) AS c FROM transactions t "
+        f"WHERE t.child_id = ? AND t.rule_id = ? AND t.status IN ('pending','approved') {where}",
+        (child_id, rule_id),
+    ).fetchone()["c"]
 
 
 def pocket_balance(conn: sqlite3.Connection, child_id: int) -> int:

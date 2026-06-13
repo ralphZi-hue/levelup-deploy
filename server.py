@@ -22,7 +22,7 @@ import gamify
 import learn
 import mailer
 from auth import authenticate, hash_password, session_secret
-from db import BASE_DIR, child_balance, pocket_balance, db, get_setting, init_db, set_setting
+from db import BASE_DIR, child_balance, pocket_balance, rule_uses_this_period, db, get_setting, init_db, set_setting
 from seed import seed
 
 _MONTH_NAMES = [
@@ -105,6 +105,29 @@ def _trend(cents: int) -> str:
     if cents < 0:
         return "down"
     return "flat"
+
+
+def _dinner_data(conn: sqlite3.Connection, today: str) -> tuple:
+    """Gibt (config, slots, claims_by_slot) für heute zurück."""
+    config = conn.execute("SELECT * FROM dinner_config WHERE id = 1").fetchone()
+    slots = conn.execute("SELECT * FROM dinner_slots ORDER BY sort_ord").fetchall()
+    claims = conn.execute(
+        "SELECT dc.*, u.name AS child_name FROM dinner_claims dc "
+        "JOIN users u ON u.id = dc.child_id WHERE dc.date = ?",
+        (today,),
+    ).fetchall()
+    return config, slots, {c["slot_key"]: c for c in claims}
+
+
+def _book_tx(conn: sqlite3.Connection, child_id: int, title: str, amount: int,
+             note: str, admin_id: int) -> int:
+    """Erstellt eine sofort genehmigte Transaktion und gibt die ID zurück."""
+    cur = conn.execute(
+        "INSERT INTO transactions(child_id, title, amount, status, note, "
+        "created_by, decided_by, decided_at) VALUES(?,?,?,'approved',?,?,?,datetime('now'))",
+        (child_id, title, amount, note, admin_id, admin_id),
+    )
+    return cur.lastrowid
 
 
 def attach_evidence(
@@ -202,9 +225,14 @@ def child_dashboard(request: Request):
             "SELECT COUNT(*) AS c FROM transactions WHERE child_id = ? AND status = 'pending'",
             (user["id"],),
         ).fetchone()["c"]
-        rules = conn.execute(
+        rules_raw = conn.execute(
             "SELECT * FROM rules WHERE active = 1 ORDER BY category, amount DESC"
         ).fetchall()
+        rule_uses = {
+            r["id"]: rule_uses_this_period(conn, user["id"], r["id"], r["period"])
+            for r in rules_raw if r["max_uses"] and r["period"]
+        }
+        rules = rules_raw
         tasks = conn.execute(
             "SELECT * FROM assignments WHERE child_id = ? AND status IN ('open','pending') "
             "ORDER BY (deadline IS NULL), deadline ASC, id ASC",
@@ -212,6 +240,8 @@ def child_dashboard(request: Request):
         ).fetchall()
         payout_day = get_setting(conn, "payout_day", "1")
         pocket = pocket_balance(conn, user["id"])
+        today_str = date.today().isoformat()
+        dinner_cfg, dinner_slots, dinner_claims_map = _dinner_data(conn, today_str)
 
         level = gamify.level_info(_xp(conn, user["id"]))
         week = _weekly_change(conn, user["id"])
@@ -228,9 +258,12 @@ def child_dashboard(request: Request):
         {
             "request": request, "user": user, "balance": balance,
             "recent": recent, "pending": pending, "rules": rules, "tasks": tasks,
-            "today": date.today().isoformat(),
+            "today": today_str,
             "payout_day": payout_day, "pocket": pocket, "flash": pop_flash(request),
             "level": level, "week": week, "week_trend": _trend(week), "siblings": siblings,
+            "rule_uses": rule_uses,
+            "dinner_cfg": dinner_cfg, "dinner_slots": dinner_slots,
+            "dinner_claims_map": dinner_claims_map,
         },
     )
 
@@ -277,6 +310,11 @@ def submit_claim(
         if rule["requires_proof"] and not has_photo:
             flash(request, "Für diese Aufgabe ist ein Beweisfoto nötig. 📷", "err")
             return RedirectResponse(f"/claim/new?rule_id={rule_id}", status_code=303)
+        if rule["max_uses"] and rule["period"]:
+            uses = rule_uses_this_period(conn, user["id"], rule["id"], rule["period"])
+            if uses >= rule["max_uses"]:
+                flash(request, f"Limit für diese Aufgabe erreicht ({rule['max_uses']}× pro {rule['period']}). ⛔", "err")
+                return RedirectResponse("/me", status_code=303)
         cur = conn.execute(
             "INSERT INTO transactions(child_id, rule_id, title, amount, status, note, created_by) "
             "VALUES(?,?,?,?,'pending',?,?)",
@@ -367,7 +405,9 @@ def admin_dashboard(request: Request):
             "SELECT * FROM users WHERE role = 'child' ORDER BY name"
         ).fetchall()
         today = date.today()
+        today_str = today.isoformat()
         current_month = f"{_MONTH_NAMES[today.month - 1]} {today.year}"
+        dinner_cfg, dinner_slots, dinner_claims_map = _dinner_data(conn, today_str)
         kids = []
         for c in children:
             kids.append({
@@ -390,6 +430,8 @@ def admin_dashboard(request: Request):
             "request": request, "user": user, "kids": kids,
             "pending": pending, "rules": rules,
             "current_month": current_month, "flash": pop_flash(request),
+            "dinner_cfg": dinner_cfg, "dinner_slots": dinner_slots,
+            "dinner_claims_map": dinner_claims_map, "today": today_str,
         },
     )
 
@@ -616,6 +658,144 @@ def evidence_detail(request: Request, ev_id: int):
     )
 
 
+# ---------------------------------------------------------------------------
+# Abendessen (Dinner)
+# ---------------------------------------------------------------------------
+
+@app.post("/admin/dinner/config")
+def admin_dinner_config(
+    request: Request,
+    active: str = Form("0"),
+    dinner_time: str = Form(""),
+    menu: str = Form(""),
+    slot_decken_active: str = Form("0"),
+    slot_decken_amount: str = Form(""),
+    slot_decken_mode: str = Form("plus"),
+    slot_abdecken_active: str = Form("0"),
+    slot_abdecken_amount: str = Form(""),
+    slot_abdecken_mode: str = Form("plus"),
+    slot_kueche_active: str = Form("0"),
+    slot_kueche_amount: str = Form(""),
+    slot_kueche_mode: str = Form("plus"),
+):
+    with db() as conn:
+        user = current_user(request, conn)
+        if not user or user["role"] != "admin":
+            return RedirectResponse("/", status_code=303)
+        today_str = date.today().isoformat()
+        conn.execute(
+            "UPDATE dinner_config SET active=?, dinner_time=?, menu=?, date=? WHERE id=1",
+            (1 if active == "1" else 0, dinner_time.strip() or None,
+             menu.strip() or None, today_str),
+        )
+        for key, amount_s, mode, act_s in [
+            ("decken",   slot_decken_amount,   slot_decken_mode,   slot_decken_active),
+            ("abdecken", slot_abdecken_amount, slot_abdecken_mode, slot_abdecken_active),
+            ("kueche",   slot_kueche_amount,   slot_kueche_mode,   slot_kueche_active),
+        ]:
+            try:
+                cents = int(round(float(amount_s.replace(",", ".")) * 100)) if amount_s.strip() else None
+            except ValueError:
+                cents = None
+            updates = ["active = ?"]
+            vals: list = [1 if act_s == "1" else 0]
+            if cents is not None:
+                updates.append("amount = ?")
+                vals.append(cents)
+            if mode in ("plus", "minus", "both"):
+                updates.append("mode = ?")
+                vals.append(mode)
+            vals.append(key)
+            conn.execute(f"UPDATE dinner_slots SET {', '.join(updates)} WHERE slot_key=?", vals)
+    flash(request, "Abendessen gespeichert. ✅")
+    return RedirectResponse("/admin", status_code=303)
+
+
+@app.post("/admin/dinner/{claim_id}/settle")
+def admin_dinner_settle(request: Request, claim_id: int, result: str = Form(...)):
+    with db() as conn:
+        user = current_user(request, conn)
+        if not user or user["role"] != "admin":
+            return RedirectResponse("/", status_code=303)
+        if result not in ("done", "late", "missed"):
+            flash(request, "Ungültiges Ergebnis.", "err")
+            return RedirectResponse("/admin", status_code=303)
+        claim = conn.execute(
+            "SELECT dc.*, ds.amount, ds.mode, ds.label, u.name AS child_name "
+            "FROM dinner_claims dc "
+            "JOIN dinner_slots ds ON ds.slot_key = dc.slot_key "
+            "JOIN users u ON u.id = dc.child_id "
+            "WHERE dc.id = ? AND dc.result IS NULL",
+            (claim_id,),
+        ).fetchone()
+        if not claim:
+            flash(request, "Nicht gefunden oder bereits abgerechnet.", "err")
+            return RedirectResponse("/admin", status_code=303)
+        mode, amount = claim["mode"], claim["amount"]
+        tx_id = None
+        if result == "done" and mode in ("plus", "both"):
+            tx_id = _book_tx(conn, claim["child_id"],
+                             f"🍽️ {claim['label']}",
+                             amount,
+                             f"Abendessen · pünktlich erledigt ✅",
+                             user["id"])
+        elif result in ("late", "missed") and mode in ("minus", "both"):
+            symbol = "⏰" if result == "late" else "❌"
+            tx_id = _book_tx(conn, claim["child_id"],
+                             f"🍽️ {claim['label']}",
+                             -amount,
+                             f"Abendessen · {'verspätet' if result=='late' else 'nicht erledigt'} {symbol}",
+                             user["id"])
+        conn.execute("UPDATE dinner_claims SET result=?, tx_id=? WHERE id=?",
+                     (result, tx_id, claim_id))
+    flash(request, "Abgerechnet. ✅")
+    return RedirectResponse("/admin", status_code=303)
+
+
+@app.post("/dinner/commit")
+def dinner_commit(request: Request, slot_key: str = Form(...)):
+    with db() as conn:
+        user = current_user(request, conn)
+        if not user or user["role"] != "child":
+            return RedirectResponse("/", status_code=303)
+        cfg = conn.execute("SELECT * FROM dinner_config WHERE id=1").fetchone()
+        today_str = date.today().isoformat()
+        if not cfg or not cfg["active"] or cfg["date"] != today_str:
+            flash(request, "Kein Abendessen heute geplant.", "err")
+            return RedirectResponse("/me", status_code=303)
+        slot = conn.execute(
+            "SELECT * FROM dinner_slots WHERE slot_key=? AND active=1", (slot_key,)
+        ).fetchone()
+        if not slot:
+            flash(request, "Aufgabe nicht verfügbar.", "err")
+            return RedirectResponse("/me", status_code=303)
+        try:
+            conn.execute(
+                "INSERT INTO dinner_claims(date, slot_key, child_id) VALUES(?,?,?)",
+                (today_str, slot_key, user["id"]),
+            )
+        except Exception:
+            flash(request, "Diese Aufgabe ist bereits vergeben.", "err")
+            return RedirectResponse("/me", status_code=303)
+    flash(request, f"Angemeldet: {slot['label']} ✅")
+    return RedirectResponse("/me", status_code=303)
+
+
+@app.post("/dinner/cancel")
+def dinner_cancel(request: Request, slot_key: str = Form(...)):
+    with db() as conn:
+        user = current_user(request, conn)
+        if not user or user["role"] != "child":
+            return RedirectResponse("/", status_code=303)
+        today_str = date.today().isoformat()
+        conn.execute(
+            "DELETE FROM dinner_claims WHERE date=? AND slot_key=? AND child_id=? AND result IS NULL",
+            (today_str, slot_key, user["id"]),
+        )
+    flash(request, "Anmeldung zurückgezogen.")
+    return RedirectResponse("/me", status_code=303)
+
+
 @app.get("/admin/rules", response_class=HTMLResponse)
 def admin_rules(request: Request):
     with db() as conn:
@@ -638,6 +818,10 @@ def add_rule(
     category: str = Form(...),
     amount: str = Form(...),
     requires_proof: str = Form("0"),
+    amount_mode: str = Form("both"),
+    is_surprise: str = Form("0"),
+    max_uses: str = Form(""),
+    period: str = Form(""),
 ):
     with db() as conn:
         user = current_user(request, conn)
@@ -648,9 +832,21 @@ def add_rule(
         except ValueError:
             flash(request, "Betrag ungültig (z.B. 0,50 oder -1).", "err")
             return RedirectResponse("/admin/rules", status_code=303)
+        try:
+            max_uses_int = int(max_uses) if max_uses.strip() else None
+        except ValueError:
+            max_uses_int = None
         conn.execute(
-            "INSERT INTO rules(title, category, amount, requires_proof) VALUES(?,?,?,?)",
-            (title.strip(), category, cents, 1 if requires_proof == "1" else 0),
+            "INSERT INTO rules(title, category, amount, requires_proof, "
+            "amount_mode, is_surprise, max_uses, period) VALUES(?,?,?,?,?,?,?,?)",
+            (
+                title.strip(), category, cents,
+                1 if requires_proof == "1" else 0,
+                amount_mode if amount_mode in ("plus", "minus", "both") else "both",
+                1 if is_surprise == "1" else 0,
+                max_uses_int,
+                period if period in ("day", "week", "month") else None,
+            ),
         )
     flash(request, "Regel hinzugefügt. ✅")
     return RedirectResponse("/admin/rules", status_code=303)
