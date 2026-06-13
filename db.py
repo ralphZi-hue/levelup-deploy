@@ -150,6 +150,25 @@ CREATE TABLE IF NOT EXISTS invites (
     used_at       TEXT
 );
 
+CREATE TABLE IF NOT EXISTS assignments (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    child_id      INTEGER NOT NULL REFERENCES users(id),
+    title         TEXT    NOT NULL,
+    category      TEXT    NOT NULL CHECK (category IN ('schule','haushalt','verhalten')),
+    amount        INTEGER NOT NULL,              -- signiert, in Cent (+ Belohnung / - Abzug)
+    deadline      TEXT,                          -- YYYY-MM-DD, optional
+    requires_proof INTEGER NOT NULL DEFAULT 0,
+    note          TEXT,
+    status        TEXT    NOT NULL DEFAULT 'open'
+                          CHECK (status IN ('open','pending','approved','rejected')),
+    tx_id         INTEGER REFERENCES transactions(id),
+    created_by    INTEGER NOT NULL REFERENCES users(id),
+    created_at    TEXT    NOT NULL DEFAULT (datetime('now')),
+    completed_at  TEXT,
+    decided_by    INTEGER REFERENCES users(id),
+    decided_at    TEXT
+);
+
 CREATE INDEX IF NOT EXISTS idx_tx_child  ON transactions(child_id);
 CREATE INDEX IF NOT EXISTS idx_tx_status ON transactions(status);
 CREATE INDEX IF NOT EXISTS idx_ev_tx     ON evidence(tx_id);
