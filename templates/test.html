@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+{% block title %}Test · FamBank{% endblock %}
+{% block content %}
+
+<div class="exam-head">
+  <div>
+    <span class="ph-subject">{{ deck.subject|subj_emoji }} {{ deck.subject }} · Prüfungsmodus 🎓</span>
+    <span class="ph-title">{{ deck.title }}</span>
+  </div>
+  <div class="exam-timer" id="timer">--:--</div>
+</div>
+<p class="hint">Tippe die richtige Antwort ein. Bei <strong>{{ session.pass_pct }}%</strong> richtig gibt es <strong>{{ session.reward|euro }}</strong>. Kein Aufdecken – das ist ein echter Test. 💪</p>
+
+<div class="prog"><div class="prog-fill" id="progFill" style="width:0%"></div></div>
+<div class="prog-meta"><span id="progText">0 / {{ questions|length }}</span></div>
+
+<div id="examArea">
+  <div class="exam-card" id="examCard"></div>
+  <form id="answerForm" autocomplete="off">
+    <input type="text" id="answerInput" placeholder="Deine Antwort…" autocapitalize="none" autocomplete="off" autofocus>
+    <button type="submit" id="submitBtn">Abschicken →</button>
+  </form>
+  <div class="exam-feedback" id="feedback"></div>
+</div>
+
+<div id="resultArea" class="done-area" style="display:none">
+  <div class="done-emoji" id="resEmoji">🎉</div>
+  <h2 id="resTitle"></h2>
+  <p id="resStats" class="hint"></p>
+  <a class="deck-go" href="/learn">Zurück zur Übersicht →</a>
+</div>
+
+<script id="qData" type="application/json">{{ questions|tojson }}</script>
+<script>
+(function(){
+  var qs = JSON.parse(document.getElementById('qData').textContent);
+  var sid = {{ session.id }};
+  var rewardCents = {{ session.reward }};
+  var i=0, done=false;
+  var card=document.getElementById('examCard'), form=document.getElementById('answerForm'),
+      input=document.getElementById('answerInput'), fb=document.getElementById('feedback'),
+      progFill=document.getElementById('progFill'), progText=document.getElementById('progText'),
+      timerEl=document.getElementById('timer');
+
+  function euro(c){var s=c<0?'-':'';c=Math.abs(c);return s+Math.floor(c/100)+','+('0'+(c%100)).slice(-2)+' €';}
+  function blip(f,d){try{var a=new (window.AudioContext||window.webkitAudioContext)();
+    var o=a.createOscillator(),g=a.createGain();o.frequency.value=f;
+    g.gain.setValueAtTime(0.0001,a.currentTime);g.gain.exponentialRampToValueAtTime(0.2,a.currentTime+0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001,a.currentTime+d);o.connect(g);g.connect(a.destination);
+    o.start();o.stop(a.currentTime+d);}catch(e){}}
+  function confetti(){for(var k=0;k<80;k++){(function(){var s=document.createElement('div');
+    s.textContent=['🎉','⭐','💰','🏆','🌟'][k%5];
+    s.style.cssText='position:absolute;top:-20px;z-index:9;pointer-events:none;left:'+(Math.random()*100)+'%;font-size:'+(14+Math.random()*16)+'px;';
+    s.animate([{transform:'translateY(0) rotate(0)',opacity:1},{transform:'translateY(90vh) rotate(540deg)',opacity:0}],
+      {duration:1800+Math.random()*1400,delay:Math.random()*300,easing:'linear'});
+    document.body.appendChild(s);setTimeout(function(){s.remove();},3400);})();}}
+
+  function show(){
+    var q=qs[i];
+    card.textContent=q.front;
+    input.value=''; input.focus(); fb.textContent='';
+    progText.textContent=i+' / '+qs.length;
+    progFill.style.width=Math.round(100*i/qs.length)+'%';
+  }
+
+  form.addEventListener('submit', function(e){
+    e.preventDefault();
+    if(done) return;
+    var q=qs[i];
+    var fd=new FormData(); fd.append('card_id', q.id); fd.append('answer', input.value);
+    fetch('/test/'+sid+'/answer',{method:'POST',body:fd})
+      .then(function(r){return r.json();})
+      .then(function(d){
+        if(d.correct){ fb.textContent='✅ Richtig!'; fb.className='exam-feedback ok'; blip(880,0.08); }
+        else { fb.textContent='❌ Leider falsch'; fb.className='exam-feedback no'; blip(300,0.14); }
+        i++;
+        if(i>=qs.length){ setTimeout(finish, 500); }
+        else { setTimeout(show, 500); }
+      })
+      .catch(function(){ i++; if(i>=qs.length) finish(); else show(); });
+  });
+
+  function finish(){
+    if(done) return; done=true;
+    progFill.style.width='100%'; progText.textContent=qs.length+' / '+qs.length;
+    fetch('/test/'+sid+'/finish',{method:'POST'})
+      .then(function(r){return r.json();})
+      .then(function(d){
+        document.getElementById('examArea').style.display='none';
+        var area=document.getElementById('resultArea'); area.style.display='block';
+        var pct = d.pct!=null ? d.pct : Math.round(100*d.correct/d.total);
+        if(d.passed){
+          document.getElementById('resEmoji').textContent='🏆';
+          document.getElementById('resTitle').textContent='Bestanden! '+euro(rewardCents)+' verdient 🎉';
+          document.getElementById('resStats').textContent=d.correct+' von '+d.total+' richtig ('+pct+'%) – wird deinem Konto gutgeschrieben.';
+          blip(523,0.16);[659,784,1047].forEach(function(f,k){setTimeout(function(){blip(f,0.16);},(k+1)*120);});
+          confetti();
+        } else {
+          document.getElementById('resEmoji').textContent='💪';
+          document.getElementById('resTitle').textContent='Knapp daneben';
+          document.getElementById('resStats').textContent=d.correct+' von '+d.total+' richtig ('+pct+'%). Übe nochmal und frag nach einem neuen Test.';
+        }
+      });
+  }
+
+  // Countdown
+  var secs={{ seconds }};
+  function tick(){
+    var m=Math.floor(secs/60), s=secs%60;
+    timerEl.textContent=m+':'+('0'+s).slice(-2);
+    if(secs<=0){ if(!done){ finish(); } return; }
+    secs--; setTimeout(tick,1000);
+  }
+  if(qs.length){ show(); tick(); } else { finish(); }
+})();
+</script>
+{% endblock %}

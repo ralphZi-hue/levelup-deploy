@@ -59,6 +59,7 @@ kryptografische Garantie – das wäre nur mit einer nativen App + Hardware-Atte
 - `transactions` – Buchungen (Ledger), Status `pending`/`approved`/`rejected`
 - `evidence` – Beweisfotos zu Buchungen (Datei, Server-/Geräte-Zeit, Geo, EXIF)
 - `decks` / `cards` – Karteikästen pro Kind & Fach + Leitner-Karten (Fach 1–5, Fälligkeit)
+- `test_sessions` / `test_answers` – verifizierte Tests (Status, Belohnung, Trefferquote, Ergebnisse)
 - `settings` – Konfiguration (z.B. Auszahlungstag)
 
 Beweisfotos liegen unter `data/uploads/` (gitignored) und werden nur über die geschützte
