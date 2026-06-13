@@ -236,6 +236,7 @@ MIGRATIONS = [
     ("rules", "period", "ALTER TABLE rules ADD COLUMN period TEXT"),
     ("rules", "amount_mode", "ALTER TABLE rules ADD COLUMN amount_mode TEXT NOT NULL DEFAULT 'both'"),
     ("rules", "is_surprise", "ALTER TABLE rules ADD COLUMN is_surprise INTEGER NOT NULL DEFAULT 0"),
+    ("rules", "conditions", "ALTER TABLE rules ADD COLUMN conditions TEXT"),
 ]
 
 
