@@ -496,16 +496,35 @@ def _deck_stats(conn: sqlite3.Connection, deck_id: int) -> dict:
     return {"total": total, "due": due, "learned": learned}
 
 
+def _expire_stale_tests(conn: sqlite3.Connection) -> None:
+    conn.execute(
+        "UPDATE test_sessions SET status = 'expired' "
+        "WHERE status = 'unlocked' AND expires_at IS NOT NULL AND expires_at < datetime('now')"
+    )
+
+
+def _active_test(conn: sqlite3.Connection, deck_id: int, child_id: int):
+    return conn.execute(
+        "SELECT * FROM test_sessions WHERE deck_id = ? AND child_id = ? "
+        "AND status IN ('unlocked','running') ORDER BY id DESC LIMIT 1",
+        (deck_id, child_id),
+    ).fetchone()
+
+
 @app.get("/learn", response_class=HTMLResponse)
 def learn_home(request: Request):
     with db() as conn:
         user = current_user(request, conn)
         if not user or user["role"] != "child":
             return RedirectResponse("/", status_code=303)
+        _expire_stale_tests(conn)
         rows = conn.execute(
             "SELECT * FROM decks WHERE child_id = ? ORDER BY subject, title", (user["id"],)
         ).fetchall()
-        decks = [{"row": d, "stats": _deck_stats(conn, d["id"])} for d in rows]
+        decks = [
+            {"row": d, "stats": _deck_stats(conn, d["id"]), "test": _active_test(conn, d["id"], user["id"])}
+            for d in rows
+        ]
     return templates.TemplateResponse(
         "learn_child.html",
         {"request": request, "user": user, "decks": decks, "flash": pop_flash(request)},
@@ -570,11 +589,19 @@ def admin_learn(request: Request):
         if not user or user["role"] != "admin":
             return RedirectResponse("/", status_code=303)
         children = conn.execute("SELECT * FROM users WHERE role = 'child' ORDER BY name").fetchall()
+        _expire_stale_tests(conn)
         rows = conn.execute(
             "SELECT d.*, u.name AS child_name FROM decks d JOIN users u ON u.id = d.child_id "
             "ORDER BY u.name, d.subject, d.title"
         ).fetchall()
-        decks = [{"row": d, "stats": _deck_stats(conn, d["id"])} for d in rows]
+        decks = []
+        for d in rows:
+            active = _active_test(conn, d["id"], d["child_id"])
+            last = conn.execute(
+                "SELECT * FROM test_sessions WHERE deck_id = ? AND status IN ('passed','failed') "
+                "ORDER BY id DESC LIMIT 1", (d["id"],)
+            ).fetchone()
+            decks.append({"row": d, "stats": _deck_stats(conn, d["id"]), "active": active, "last": last})
     return templates.TemplateResponse(
         "admin_learn.html",
         {"request": request, "user": user, "children": children, "decks": decks,
@@ -666,3 +693,166 @@ def admin_deck_delete(request: Request, deck_id: int):
         conn.execute("DELETE FROM decks WHERE id = ?", (deck_id,))
     flash(request, "Karteikasten gelöscht.")
     return RedirectResponse("/admin/learn", status_code=303)
+
+
+# ---------------------------------------------------------------------------
+# Verifizierter Test (Phase 3b) – Freischaltung durch Eltern, ohne PIN
+# ---------------------------------------------------------------------------
+
+@app.post("/admin/learn/deck/{deck_id}/unlock_test")
+def admin_unlock_test(request: Request, deck_id: int, reward: str = Form(""), pass_pct: str = Form("")):
+    with db() as conn:
+        user = current_user(request, conn)
+        if not user or user["role"] != "admin":
+            return RedirectResponse("/", status_code=303)
+        deck = conn.execute("SELECT * FROM decks WHERE id = ?", (deck_id,)).fetchone()
+        if not deck:
+            return RedirectResponse("/admin/learn", status_code=303)
+        ncards = conn.execute("SELECT COUNT(*) AS c FROM cards WHERE deck_id = ?", (deck_id,)).fetchone()["c"]
+        if ncards == 0:
+            flash(request, "Dieser Karteikasten hat noch keine Karten.", "err")
+            return RedirectResponse("/admin/learn", status_code=303)
+        try:
+            reward_c = int(round(float((reward or "1").replace(",", ".")) * 100))
+        except ValueError:
+            reward_c = learn.TEST_DEFAULT_REWARD
+        try:
+            pp = max(1, min(100, int(pass_pct or learn.TEST_DEFAULT_PASS)))
+        except ValueError:
+            pp = learn.TEST_DEFAULT_PASS
+        # frühere offene Tests dieses Decks/Kindes verwerfen
+        conn.execute(
+            "UPDATE test_sessions SET status = 'cancelled' "
+            "WHERE deck_id = ? AND child_id = ? AND status IN ('unlocked','running')",
+            (deck_id, deck["child_id"]),
+        )
+        conn.execute(
+            "INSERT INTO test_sessions(deck_id, child_id, status, reward, pass_pct, unlocked_by, expires_at) "
+            "VALUES(?,?,'unlocked',?,?,?, datetime('now', ?))",
+            (deck_id, deck["child_id"], reward_c, pp, user["id"],
+             f"+{learn.TEST_START_WINDOW_MIN} minutes"),
+        )
+    flash(request, f"Test freigeschaltet ({learn.TEST_START_WINDOW_MIN} Min startbar). 🎓")
+    return RedirectResponse("/admin/learn", status_code=303)
+
+
+def _load_test(conn: sqlite3.Connection, session_id: int, child_id: int):
+    return conn.execute(
+        "SELECT * FROM test_sessions WHERE id = ? AND child_id = ?", (session_id, child_id)
+    ).fetchone()
+
+
+@app.get("/test/{session_id}", response_class=HTMLResponse)
+def test_run(request: Request, session_id: int):
+    with db() as conn:
+        user = current_user(request, conn)
+        if not user or user["role"] != "child":
+            return RedirectResponse("/", status_code=303)
+        _expire_stale_tests(conn)
+        s = _load_test(conn, session_id, user["id"])
+        if not s or s["status"] in ("passed", "failed", "expired", "cancelled"):
+            flash(request, "Dieser Test ist nicht (mehr) verfügbar.", "err")
+            return RedirectResponse("/learn", status_code=303)
+        deck = conn.execute("SELECT * FROM decks WHERE id = ?", (s["deck_id"],)).fetchone()
+        if s["status"] == "unlocked":
+            # Test starten: Fragen auswählen (nur Vorderseiten ans Kind!), Zustand setzen
+            cards = conn.execute(
+                "SELECT id, front FROM cards WHERE deck_id = ? ORDER BY RANDOM() LIMIT ?",
+                (s["deck_id"], learn.TEST_MAX_QUESTIONS),
+            ).fetchall()
+            conn.execute(
+                "UPDATE test_sessions SET status = 'running', started_at = datetime('now'), "
+                "total = ?, correct = 0 WHERE id = ?",
+                (len(cards), session_id),
+            )
+            conn.execute("DELETE FROM test_answers WHERE session_id = ?", (session_id,))
+            questions = [dict(c) for c in cards]
+            total = len(cards)
+        else:  # bereits 'running' – Fragen erneut anzeigen (Backenddaten bleiben)
+            cards = conn.execute(
+                "SELECT id, front FROM cards WHERE deck_id = ? ORDER BY RANDOM() LIMIT ?",
+                (s["deck_id"], s["total"] or learn.TEST_MAX_QUESTIONS),
+            ).fetchall()
+            questions = [dict(c) for c in cards]
+            total = s["total"] or len(cards)
+        secs = max(30, total * learn.TEST_SECONDS_PER_Q)
+    return templates.TemplateResponse(
+        "test.html",
+        {"request": request, "user": user, "deck": deck, "session": s,
+         "questions": questions, "seconds": secs},
+    )
+
+
+@app.post("/test/{session_id}/answer")
+def test_answer(request: Request, session_id: int, card_id: int = Form(...), answer: str = Form("")):
+    with db() as conn:
+        user = current_user(request, conn)
+        if not user or user["role"] != "child":
+            return JSONResponse({"ok": False}, status_code=403)
+        s = _load_test(conn, session_id, user["id"])
+        if not s or s["status"] != "running":
+            return JSONResponse({"ok": False}, status_code=409)
+        card = conn.execute(
+            "SELECT * FROM cards WHERE id = ? AND deck_id = ?", (card_id, s["deck_id"])
+        ).fetchone()
+        if not card:
+            return JSONResponse({"ok": False}, status_code=404)
+        # nur einmal pro Karte werten
+        already = conn.execute(
+            "SELECT 1 FROM test_answers WHERE session_id = ? AND card_id = ?", (session_id, card_id)
+        ).fetchone()
+        if already:
+            return JSONResponse({"ok": True, "duplicate": True})
+        ok = learn.check_answer(answer, card["back"])
+        conn.execute(
+            "INSERT INTO test_answers(session_id, card_id, given, is_correct) VALUES(?,?,?,?)",
+            (session_id, card_id, answer.strip(), 1 if ok else 0),
+        )
+        if ok:
+            conn.execute("UPDATE test_sessions SET correct = correct + 1 WHERE id = ?", (session_id,))
+    # Die richtige Antwort wird NICHT zurückgegeben (es ist ein Test)
+    return JSONResponse({"ok": True, "correct": ok})
+
+
+@app.post("/test/{session_id}/finish")
+def test_finish(request: Request, session_id: int):
+    with db() as conn:
+        user = current_user(request, conn)
+        if not user or user["role"] != "child":
+            return JSONResponse({"ok": False}, status_code=403)
+        s = _load_test(conn, session_id, user["id"])
+        if not s:
+            return JSONResponse({"ok": False}, status_code=404)
+        if s["status"] in ("passed", "failed"):
+            pct = round(100 * s["correct"] / s["total"]) if s["total"] else 0
+            return JSONResponse({"ok": True, "passed": s["status"] == "passed",
+                                 "correct": s["correct"], "total": s["total"],
+                                 "pct": pct, "reward": s["reward"]})
+        if s["status"] != "running":
+            return JSONResponse({"ok": False}, status_code=409)
+        total = s["total"] or 0
+        correct = conn.execute(
+            "SELECT COUNT(*) AS c FROM test_answers WHERE session_id = ? AND is_correct = 1",
+            (session_id,),
+        ).fetchone()["c"]
+        pct = round(100 * correct / total) if total else 0
+        passed = pct >= s["pass_pct"]
+        deck = conn.execute("SELECT * FROM decks WHERE id = ?", (s["deck_id"],)).fetchone()
+        tx_id = None
+        if passed and s["reward"] > 0:
+            cur = conn.execute(
+                "INSERT INTO transactions(child_id, rule_id, title, amount, status, note, "
+                "created_by, decided_by, decided_at) "
+                "VALUES(?,?,?,?,'approved',?,?,?, datetime('now'))",
+                (s["child_id"], None, f"✅ Test bestanden: {deck['title']}", s["reward"],
+                 f"Verifiziert · {correct}/{total} richtig ({pct}%)",
+                 s["unlocked_by"] or user["id"], s["unlocked_by"] or user["id"]),
+            )
+            tx_id = cur.lastrowid
+        conn.execute(
+            "UPDATE test_sessions SET status = ?, correct = ?, finished_at = datetime('now'), tx_id = ? "
+            "WHERE id = ?",
+            ("passed" if passed else "failed", correct, tx_id, session_id),
+        )
+    return JSONResponse({"ok": True, "passed": passed, "correct": correct, "total": total,
+                         "pct": pct, "reward": s["reward"] if passed else 0})

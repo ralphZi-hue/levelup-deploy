@@ -28,6 +28,22 @@
           <div class="deck-subject">{{ d.row.subject|subj_emoji }} {{ d.row.subject }} · {{ d.row.child_name }}</div>
           <div class="deck-title">{{ d.row.title }}</div>
           <div class="deck-stats">{{ d.stats.total }} Karten · {{ d.stats.learned }} sitzen</div>
+
+          {% if d.active %}
+            <div class="test-status active">🎓 Test {{ 'läuft gerade' if d.active.status == 'running' else 'freigeschaltet' }} · {{ d.active.reward|euro }}</div>
+          {% else %}
+            <form method="post" action="/admin/learn/deck/{{ d.row.id }}/unlock_test" class="unlock-form">
+              <input name="reward" placeholder="Belohnung €" value="1,00" inputmode="decimal">
+              <button type="submit" {{ 'disabled' if d.stats.total == 0 else '' }}>🎓 Test freischalten</button>
+            </form>
+          {% endif %}
+          {% if d.last %}
+            <div class="test-status {{ 'pass' if d.last.status == 'passed' else 'fail' }}">
+              Letzter Test: {{ '✅ bestanden' if d.last.status == 'passed' else '❌ nicht bestanden' }}
+              ({{ d.last.correct }}/{{ d.last.total }})
+            </div>
+          {% endif %}
+
           <a class="deck-go" href="/admin/learn/deck/{{ d.row.id }}">Karten verwalten →</a>
         </div>
       {% endfor %}

@@ -111,11 +111,39 @@ CREATE TABLE IF NOT EXISTS cards (
     created_at  TEXT    NOT NULL DEFAULT (datetime('now'))
 );
 
+CREATE TABLE IF NOT EXISTS test_sessions (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    deck_id     INTEGER NOT NULL REFERENCES decks(id) ON DELETE CASCADE,
+    child_id    INTEGER NOT NULL REFERENCES users(id),
+    status      TEXT    NOT NULL DEFAULT 'unlocked'
+                        CHECK (status IN ('unlocked','running','passed','failed','expired','cancelled')),
+    reward      INTEGER NOT NULL DEFAULT 100,   -- Gutschrift bei Bestehen, in Cent
+    pass_pct    INTEGER NOT NULL DEFAULT 80,    -- nötige Trefferquote
+    total       INTEGER NOT NULL DEFAULT 0,     -- Anzahl Fragen (beim Start gesetzt)
+    correct     INTEGER NOT NULL DEFAULT 0,
+    unlocked_by INTEGER REFERENCES users(id),
+    unlocked_at TEXT    NOT NULL DEFAULT (datetime('now')),
+    started_at  TEXT,
+    finished_at TEXT,
+    expires_at  TEXT,                           -- bis dahin startbar
+    tx_id       INTEGER REFERENCES transactions(id)   -- erzeugte Gutschrift
+);
+
+CREATE TABLE IF NOT EXISTS test_answers (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id  INTEGER NOT NULL REFERENCES test_sessions(id) ON DELETE CASCADE,
+    card_id     INTEGER NOT NULL REFERENCES cards(id),
+    given       TEXT,
+    is_correct  INTEGER NOT NULL DEFAULT 0
+);
+
 CREATE INDEX IF NOT EXISTS idx_tx_child  ON transactions(child_id);
 CREATE INDEX IF NOT EXISTS idx_tx_status ON transactions(status);
 CREATE INDEX IF NOT EXISTS idx_ev_tx     ON evidence(tx_id);
 CREATE INDEX IF NOT EXISTS idx_deck_child ON decks(child_id);
 CREATE INDEX IF NOT EXISTS idx_card_deck  ON cards(deck_id);
+CREATE INDEX IF NOT EXISTS idx_ts_child   ON test_sessions(child_id);
+CREATE INDEX IF NOT EXISTS idx_ta_session ON test_answers(session_id);
 """
 
 

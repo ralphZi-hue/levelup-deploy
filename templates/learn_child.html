@@ -16,6 +16,9 @@
           <span class="ds-sep">·</span>
           <span>{{ d.stats.learned }}/{{ d.stats.total }} sitzt 🌟</span>
         </div>
+        {% if d.test %}
+          <a class="test-go" href="/test/{{ d.test.id }}">🎓 Test starten · {{ d.test.reward|euro }}</a>
+        {% endif %}
         {% if d.stats.due %}
           <a class="deck-go" href="/learn/{{ d.row.id }}">Jetzt üben →</a>
         {% else %}
