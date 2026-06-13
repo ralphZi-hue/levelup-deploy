@@ -116,3 +116,50 @@ Beweisfotos liegen unter `data/uploads/` (gitignored) und werden nur über die g
 Route `/evidence/{id}/image` ausgeliefert – Kinder sehen nur ihre eigenen.
 
 Beträge werden als **ganze Cent** gespeichert (keine Fließkomma-Rundungsfehler).
+
+## Deployment (PythonAnywhere, kostenlos)
+
+PythonAnywhere bietet eine kostenlose Stufe mit **dauerhaftem Speicher** (wichtig für SQLite +
+Foto-Uploads) und einer `https://DEINUSERNAME.pythonanywhere.com`-Domain mit HTTPS. Eine eigene
+Domain ist auf der kostenlosen Stufe nicht möglich. FastAPI läuft dort über einen WSGI-Adapter
+(`pythonanywhere_wsgi.py`, bereits vorbereitet).
+
+**Einmaliges Setup (im PythonAnywhere-Dashboard, von Ralph selbst):**
+
+1. Account anlegen auf <https://www.pythonanywhere.com> (Tarif "Beginner", kostenlos, keine Kreditkarte).
+2. Im Tab **Consoles** eine Bash-Konsole öffnen und den Code holen:
+   ```bash
+   git clone https://github.com/ralphZi-hue/dflix.git
+   cd dflix && git checkout feat/fambank
+   cd Apps/FamBank
+   python3.10 -m venv .venv
+   ./.venv/bin/pip install -r requirements.txt
+   ```
+3. Im Tab **Web** -> "Add a new web app" -> "Manual configuration" -> Python-Version passend zur venv (3.10) wählen.
+4. **Virtualenv**-Feld: Pfad zur `.venv` eintragen, z.B. `/home/DEINUSERNAME/dflix/Apps/FamBank/.venv`.
+5. **Source code / Working directory**: `/home/DEINUSERNAME/dflix/Apps/FamBank`.
+6. **WSGI configuration file** öffnen, Inhalt komplett ersetzen durch:
+   ```python
+   import sys
+   path = "/home/DEINUSERNAME/dflix/Apps/FamBank"
+   if path not in sys.path:
+       sys.path.insert(0, path)
+   from pythonanywhere_wsgi import application
+   ```
+7. **Static files** (optional, schnellere Auslieferung): URL `/static/` -> Directory
+   `/home/DEINUSERNAME/dflix/Apps/FamBank/static`.
+8. "Reload" klicken. Beim ersten Start wird die DB automatisch angelegt und mit `seed.py` befüllt
+   (Start-Passwörter `ralph123` etc. – **sofort nach erstem Login ändern**, idealerweise via
+   Einladungs-Feature unter `/admin/users` neue eigene Accounts anlegen).
+
+**Aktualisieren nach Code-Änderungen:**
+```bash
+cd ~/dflix && git pull
+```
+…dann im Web-Tab auf "Reload" klicken.
+
+**Hinweis SMTP/Einladungen:** Kostenlose PythonAnywhere-Accounts haben eingeschränkten Internetzugang
+(Whitelist für externe Hosts). Falls der Versand über `smtp.gmail.com` nicht funktioniert, in der
+PythonAnywhere-Doku/Forum nach "free account whitelist SMTP" suchen oder einen Whitelist-Antrag
+stellen – das Einladungsfeature selbst (Account anlegen, Link generieren) funktioniert davon unabhängig,
+nur der automatische Mailversand könnte betroffen sein.
