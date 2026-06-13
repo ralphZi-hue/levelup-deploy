@@ -6,8 +6,9 @@
 
 <section class="panel">
   <h2>Alle Benutzer</h2>
+  {% if flash_msg %}<p class="flash {{ flash_type }}">{{ flash_msg }}</p>{% endif %}
   <table class="rules-table">
-    <thead><tr><th>Name</th><th>Benutzername</th><th>Rolle</th><th>E-Mail</th></tr></thead>
+    <thead><tr><th>Name</th><th>Benutzername</th><th>Rolle</th><th>E-Mail</th><th>Passwort</th><th></th></tr></thead>
     <tbody>
       {% for u in users %}
         <tr>
@@ -15,6 +16,25 @@
           <td>{{ u.username }}</td>
           <td>{{ '👑 Admin' if u.role == 'admin' else '🧒 Kind' }}</td>
           <td>{{ u.email or '–' }}</td>
+          <td>
+            <form method="post" action="/admin/users/{{ u.id }}/reset-password"
+                  style="display:flex;gap:4px;align-items:center;">
+              <input name="new_password" type="password" placeholder="Neues Passwort"
+                     minlength="4" required
+                     style="width:130px;padding:3px 6px;font-size:12px;border:1px solid #ccc;border-radius:4px;"
+                     data-1p-ignore data-lpignore="true" data-bwignore autocomplete="off">
+              <button class="btn-small" type="submit">Setzen</button>
+            </form>
+          </td>
+          <td>
+            {% if u.id != user.id %}
+            <form method="post" action="/admin/users/{{ u.id }}/delete"
+                  onsubmit="return confirm('{{ u.name }} wirklich löschen? Alle Buchungen werden mitgelöscht.')">
+              <button class="btn-small" type="submit"
+                      style="background:#fee2e2;color:#b91c1c;border-color:#fca5a5;">Löschen</button>
+            </form>
+            {% endif %}
+          </td>
         </tr>
       {% endfor %}
     </tbody>
