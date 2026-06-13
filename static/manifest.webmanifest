@@ -1,6 +1,6 @@
 {
-  "name": "Level",
-  "short_name": "Level",
+  "name": "LevelUp",
+  "short_name": "LevelUp",
   "description": "Taschengeld, Aufgaben und Lernen für die Familie",
   "start_url": "/",
   "display": "standalone",

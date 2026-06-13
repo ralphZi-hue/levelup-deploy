@@ -8,12 +8,12 @@
   <link rel="apple-touch-icon" href="/static/icon.svg">
   <link rel="icon" href="/static/icon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/static/style.css">
-  <title>{% block title %}Level{% endblock %}</title>
+  <title>{% block title %}LevelUp{% endblock %}</title>
 </head>
 <body class="role-{{ user.role if user else 'guest' }}">
   {% if user %}
   <header class="topbar">
-    <a class="brand" href="/">🏆 Level</a>
+    <a class="brand" href="/">🏆 LevelUp</a>
     <nav>
       {% if user.role == 'admin' %}
         <a href="/admin">Übersicht</a>
