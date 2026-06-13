@@ -179,6 +179,17 @@ CREATE INDEX IF NOT EXISTS idx_ta_session ON test_answers(session_id);
 CREATE INDEX IF NOT EXISTS idx_invite_token ON invites(token);
 CREATE INDEX IF NOT EXISTS idx_assign_child  ON assignments(child_id);
 CREATE INDEX IF NOT EXISTS idx_assign_status ON assignments(status);
+
+CREATE TABLE IF NOT EXISTS pocket_transactions (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    child_id    INTEGER NOT NULL REFERENCES users(id),
+    amount      INTEGER NOT NULL,              -- signiert, in Cent
+    type        TEXT    NOT NULL CHECK (type IN ('payout','deposit','withdrawal')),
+    note        TEXT,
+    created_by  INTEGER NOT NULL REFERENCES users(id),
+    created_at  TEXT    NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_pocket_child ON pocket_transactions(child_id);
 """
 
 
