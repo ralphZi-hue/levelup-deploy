@@ -5,3 +5,4 @@ __pycache__/
 data/*.db
 data/.session_secret
 data/uploads/
+.pa_token
