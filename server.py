@@ -155,7 +155,7 @@ def index(request: Request):
 @app.get("/login", response_class=HTMLResponse)
 def login_form(request: Request):
     return templates.TemplateResponse(
-        "login.html", {"request": request, "flash": pop_flash(request)}
+        request, "login.html", {"request": request, "flash": pop_flash(request)}
     )
 
 
@@ -212,7 +212,7 @@ def child_dashboard(request: Request):
             li = gamify.level_info(_xp(conn, c["id"]))
             siblings.append({"name": c["name"], "level": li, "trend": _trend(_weekly_change(conn, c["id"]))})
     return templates.TemplateResponse(
-        "child.html",
+        request, "child.html",
         {
             "request": request, "user": user, "balance": balance,
             "recent": recent, "pending": pending, "rules": rules,
@@ -235,7 +235,7 @@ def claim_new(request: Request, rule_id: int):
         flash(request, "Regel nicht gefunden.", "err")
         return RedirectResponse("/me", status_code=303)
     return templates.TemplateResponse(
-        "claim_new.html", {"request": request, "user": user, "rule": rule}
+        request, "claim_new.html", {"request": request, "user": user, "rule": rule}
     )
 
 
@@ -304,7 +304,7 @@ def admin_dashboard(request: Request):
             "SELECT * FROM rules WHERE active = 1 ORDER BY category, amount DESC"
         ).fetchall()
     return templates.TemplateResponse(
-        "admin.html",
+        request, "admin.html",
         {
             "request": request, "user": user, "kids": kids,
             "pending": pending, "rules": rules, "flash": pop_flash(request),
@@ -466,7 +466,7 @@ def evidence_detail(request: Request, ev_id: int):
     if not row:
         return HTMLResponse("Nicht gefunden.", status_code=404)
     return templates.TemplateResponse(
-        "evidence.html", {"request": request, "user": user, "ev": row, "tx": tx}
+        request, "evidence.html", {"request": request, "user": user, "ev": row, "tx": tx}
     )
 
 
@@ -480,7 +480,7 @@ def admin_rules(request: Request):
             "SELECT * FROM rules ORDER BY active DESC, category, amount DESC"
         ).fetchall()
     return templates.TemplateResponse(
-        "rules.html",
+        request, "rules.html",
         {"request": request, "user": user, "rules": rules, "flash": pop_flash(request)},
     )
 
@@ -547,7 +547,7 @@ def admin_users(request: Request):
             "configured": mailer.smtp_configured(conn),
         }
     return templates.TemplateResponse(
-        "admin_users.html",
+        request, "admin_users.html",
         {
             "request": request, "user": user, "users": users, "invites": invites,
             "smtp": smtp, "flash": pop_flash(request),
@@ -680,7 +680,7 @@ def register_form(request: Request, token: str):
         flash(request, "Diese Einladung ist ungültig oder wurde bereits verwendet.", "err")
         return RedirectResponse("/login", status_code=303)
     return templates.TemplateResponse(
-        "register.html", {"request": request, "invite": inv, "flash": pop_flash(request)}
+        request, "register.html", {"request": request, "invite": inv, "flash": pop_flash(request)}
     )
 
 
@@ -763,7 +763,7 @@ def learn_home(request: Request):
             for d in rows
         ]
     return templates.TemplateResponse(
-        "learn_child.html",
+        request, "learn_child.html",
         {"request": request, "user": user, "decks": decks, "flash": pop_flash(request)},
     )
 
@@ -786,7 +786,7 @@ def learn_practice(request: Request, deck_id: int):
             (deck_id,),
         ).fetchall()
     return templates.TemplateResponse(
-        "practice.html",
+        request, "practice.html",
         {"request": request, "user": user, "deck": deck,
          "cards": [dict(c) for c in cards]},
     )
@@ -840,7 +840,7 @@ def admin_learn(request: Request):
             ).fetchone()
             decks.append({"row": d, "stats": _deck_stats(conn, d["id"]), "active": active, "last": last})
     return templates.TemplateResponse(
-        "admin_learn.html",
+        request, "admin_learn.html",
         {"request": request, "user": user, "children": children, "decks": decks,
          "flash": pop_flash(request)},
     )
@@ -880,7 +880,7 @@ def admin_deck(request: Request, deck_id: int):
             "SELECT * FROM cards WHERE deck_id = ? ORDER BY id", (deck_id,)
         ).fetchall()
     return templates.TemplateResponse(
-        "admin_deck.html",
+        request, "admin_deck.html",
         {"request": request, "user": user, "deck": deck, "cards": cards,
          "flash": pop_flash(request)},
     )
@@ -1014,7 +1014,7 @@ def test_run(request: Request, session_id: int):
             total = s["total"] or len(cards)
         secs = max(30, total * learn.TEST_SECONDS_PER_Q)
     return templates.TemplateResponse(
-        "test.html",
+        request, "test.html",
         {"request": request, "user": user, "deck": deck, "session": s,
          "questions": questions, "seconds": secs},
     )
