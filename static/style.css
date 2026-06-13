@@ -335,6 +335,37 @@ body.role-child .rule-card:active { transform: scale(.97); }
 
 .danger-zone { border: 1px dashed #f4c2c2; box-shadow: none; }
 
+/* Verifizierter Test */
+.test-go {
+  display: block; text-align: center; margin-top: 6px; padding: 11px;
+  background: linear-gradient(135deg, #f59e0b, #f97316); color: #fff;
+  border-radius: 12px; font-weight: 700; font-size: 14px;
+}
+.unlock-form { display: flex; gap: 6px; margin-top: 8px; }
+.unlock-form input { margin-top: 0; flex: 1; min-width: 0; padding: 9px 10px; }
+.unlock-form button { white-space: nowrap; padding: 9px 12px; font-size: 13px;
+  background: linear-gradient(135deg, #f59e0b, #f97316); }
+.unlock-form button:disabled { background: #ccc; cursor: not-allowed; }
+.test-status { margin-top: 8px; font-size: 13px; font-weight: 600; padding: 7px 10px; border-radius: 10px; }
+.test-status.active { background: #fff7ed; color: #b45309; border: 1px solid #fed7aa; }
+.test-status.pass { background: #f0fbf4; color: #137a3a; }
+.test-status.fail { background: #fdf2f2; color: #b91c1c; }
+
+.exam-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 8px; }
+.exam-timer { font-size: 22px; font-weight: 800; color: var(--brand); font-variant-numeric: tabular-nums;
+  background: #f1f0ff; padding: 4px 12px; border-radius: 10px; }
+.exam-card {
+  background: var(--card); border: 1px solid var(--line); border-radius: 20px;
+  padding: 36px 24px; text-align: center; font-size: 28px; font-weight: 700;
+  box-shadow: var(--shadow); min-height: 120px; display: flex; align-items: center; justify-content: center;
+}
+#answerForm { display: flex; gap: 8px; margin-top: 14px; }
+#answerForm input { margin-top: 0; flex: 1; font-size: 17px; padding: 14px; }
+#answerForm button { padding: 14px 18px; font-size: 16px; }
+.exam-feedback { text-align: center; font-weight: 700; font-size: 16px; min-height: 24px; margin-top: 12px; }
+.exam-feedback.ok { color: var(--plus); }
+.exam-feedback.no { color: var(--minus); }
+
 @media (max-width: 480px) {
   .hero-amount { font-size: 44px; }
   .book-form { grid-template-columns: 1fr; }
