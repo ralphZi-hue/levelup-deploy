@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% block title %}Benutzer · LevelUp{% endblock %}
+{% block content %}
+
+<h1>Benutzer</h1>
+
+<section class="panel">
+  <h2>Alle Benutzer</h2>
+  <table class="rules-table">
+    <thead><tr><th>Name</th><th>Benutzername</th><th>Rolle</th><th>E-Mail</th></tr></thead>
+    <tbody>
+      {% for u in users %}
+        <tr>
+          <td>{{ u.name }}</td>
+          <td>{{ u.username }}</td>
+          <td>{{ '👑 Admin' if u.role == 'admin' else '🧒 Kind' }}</td>
+          <td>{{ u.email or '–' }}</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+
+{% if invites %}
+<section class="panel">
+  <h2>Offene Einladungen</h2>
+  <table class="rules-table">
+    <thead><tr><th>Name</th><th>Benutzername</th><th>Rolle</th><th>E-Mail</th><th></th></tr></thead>
+    <tbody>
+      {% for inv in invites %}
+        <tr>
+          <td>{{ inv.name }}</td>
+          <td>{{ inv.username }}</td>
+          <td>{{ '👑 Admin' if inv.role == 'admin' else '🧒 Kind' }}</td>
+          <td>{{ inv.email }}</td>
+          <td>
+            <form method="post" action="/admin/users/invite/{{ inv.id }}/resend" style="display:inline">
+              <button class="btn-small" type="submit">Erneut senden</button>
+            </form>
+            <form method="post" action="/admin/users/invite/{{ inv.id }}/cancel" style="display:inline">
+              <button class="btn-small" type="submit">Zurückziehen</button>
+            </form>
+          </td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endif %}
+
+<section class="panel">
+  <h2>Neue Person einladen</h2>
+  {% if not smtp.configured %}
+    <p class="hint">⚠️ SMTP ist noch nicht eingerichtet – trage zuerst die Mail-Zugangsdaten unten ein.</p>
+  {% endif %}
+  <form method="post" action="/admin/users/invite" class="book-form">
+    <label>Name <input name="name" required placeholder="z.B. Anja" data-1p-ignore data-lpignore="true" data-bwignore autocomplete="off"></label>
+    <label>Benutzername <input name="username" required placeholder="z.B. anja" autocapitalize="none" data-1p-ignore data-lpignore="true" data-bwignore autocomplete="off"></label>
+    <label class="wide">E-Mail <input name="email" type="email" required placeholder="z.B. anja@example.com" data-1p-ignore data-lpignore="true" data-bwignore autocomplete="off"></label>
+    <label>Rolle
+      <select name="role" id="inviteRole" onchange="document.getElementById('inviteAllowance').style.display = this.value === 'child' ? '' : 'none'">
+        <option value="child">🧒 Kind</option>
+        <option value="admin">👑 Admin</option>
+      </select>
+    </label>
+    <label id="inviteAllowance">Grund-Taschengeld € <input name="base_allowance" placeholder="z.B. 15,00" data-1p-ignore data-lpignore="true" data-bwignore autocomplete="off"></label>
+    <button type="submit">Einladung per E-Mail senden</button>
+  </form>
+</section>
+
+<section class="panel">
+  <h2>Mail-Einstellungen (SMTP)</h2>
+  <p class="hint">Wird zum Versand der Einladungs-Mails verwendet, z.B. ein Gmail-App-Passwort.</p>
+  <form method="post" action="/admin/users/smtp" class="book-form">
+    <label>SMTP-Server <input name="smtp_host" value="{{ smtp.host }}" placeholder="z.B. smtp.gmail.com" data-1p-ignore data-lpignore="true" data-bwignore autocomplete="off"></label>
+    <label>Port <input name="smtp_port" value="{{ smtp.port }}" placeholder="587" data-1p-ignore data-lpignore="true" data-bwignore autocomplete="off"></label>
+    <label>Benutzername <input name="smtp_user" value="{{ smtp.user }}" placeholder="z.B. deine@gmail.com" data-1p-ignore data-lpignore="true" data-bwignore autocomplete="off"></label>
+    <label>Passwort / App-Passwort <input name="smtp_pass" type="password" placeholder="{{ '(unverändert lassen)' if smtp.configured else '' }}" data-allow-pw></label>
+    <label class="wide">Absender-Adresse <input name="smtp_from" value="{{ smtp.from }}" placeholder="z.B. deine@gmail.com" data-1p-ignore data-lpignore="true" data-bwignore autocomplete="off"></label>
+    <label>TLS
+      <select name="smtp_tls">
+        <option value="1" {{ 'selected' if smtp.tls != '0' else '' }}>an (empfohlen)</option>
+        <option value="0" {{ 'selected' if smtp.tls == '0' else '' }}>aus</option>
+      </select>
+    </label>
+    <button type="submit">Speichern</button>
+  </form>
+</section>
+
+{% endblock %}

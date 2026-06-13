@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Registrierung · LevelUp{% endblock %}
+{% block content %}
+<div class="login-card">
+  <div class="login-logo">🏆</div>
+  <h1>Willkommen, {{ invite.name }}!</h1>
+  <p class="sub">Lege dein Passwort für LevelUp fest.</p>
+
+  {% if flash %}<div class="flash {{ flash.kind }}">{{ flash.msg }}</div>{% endif %}
+
+  <form method="post" action="/register/{{ invite.token }}">
+    <label>Benutzername
+      <input value="{{ invite.username }}" disabled>
+    </label>
+    <label>Passwort
+      <input name="password" type="password" autocomplete="new-password" required minlength="6" data-allow-pw>
+    </label>
+    <label>Passwort wiederholen
+      <input name="password2" type="password" autocomplete="new-password" required minlength="6" data-allow-pw>
+    </label>
+    <button type="submit">Konto aktivieren</button>
+  </form>
+</div>
+{% endblock %}
