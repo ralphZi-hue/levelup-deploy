@@ -22,7 +22,7 @@ import gamify
 import learn
 import mailer
 from auth import authenticate, hash_password, session_secret
-from db import BASE_DIR, child_balance, pocket_balance, rule_uses_this_period, db, get_setting, init_db, set_setting
+from db import BASE_DIR, child_balance, pocket_balance, pocket_txs, rule_uses_this_period, db, get_setting, init_db, set_setting
 from seed import seed
 
 _MONTH_NAMES = [
@@ -240,6 +240,7 @@ def child_dashboard(request: Request):
         ).fetchall()
         payout_day = get_setting(conn, "payout_day", "1")
         pocket = pocket_balance(conn, user["id"])
+        p_txs = pocket_txs(conn, user["id"])
         today_str = date.today().isoformat()
         dinner_cfg, dinner_slots, dinner_claims_map = _dinner_data(conn, today_str)
 
@@ -259,7 +260,7 @@ def child_dashboard(request: Request):
             "request": request, "user": user, "balance": balance,
             "recent": recent, "pending": pending, "rules": rules, "tasks": tasks,
             "today": today_str,
-            "payout_day": payout_day, "pocket": pocket, "flash": pop_flash(request),
+            "payout_day": payout_day, "pocket": pocket, "pocket_txs": p_txs, "flash": pop_flash(request),
             "level": level, "week": week, "week_trend": _trend(week), "siblings": siblings,
             "rule_uses": rule_uses,
             "dinner_cfg": dinner_cfg, "dinner_slots": dinner_slots,
@@ -516,6 +517,7 @@ def admin_payout(
     method: str = Form("bank"),
     iban: str = Form(""),
     verwendungszweck: str = Form(""),
+    pocket_amount: str = Form(""),
 ):
     """Auszahlung erfassen – entweder als Banküberweisung oder ans Taschengeldkonto."""
     with db() as conn:
@@ -526,28 +528,43 @@ def admin_payout(
         if balance <= 0:
             flash(request, "Saldo ist 0 oder negativ – keine Auszahlung möglich.")
             return RedirectResponse("/admin", status_code=303)
+
+        if method == "pocket" and pocket_amount.strip():
+            try:
+                transfer = int(round(float(pocket_amount.replace(",", ".")) * 100))
+            except ValueError:
+                flash(request, "Betrag ungültig.", "err")
+                return RedirectResponse("/admin", status_code=303)
+            if transfer <= 0 or transfer > balance:
+                flash(request, "Betrag muss zwischen 0,01 € und dem Saldo liegen.", "err")
+                return RedirectResponse("/admin", status_code=303)
+        else:
+            transfer = balance
+
         if iban.strip():
             conn.execute("UPDATE users SET iban = ? WHERE id = ?", (iban.strip(), child_id))
+
         if method == "pocket":
-            note = "Saldo aufs Taschengeldkonto übertragen"
+            note = f"Übertrag aufs Taschengeldkonto · {transfer/100:.2f} €"
         else:
             zweck = verwendungszweck.strip() or "Saldo ausgezahlt"
             note = f"Überweisung · {zweck}"
+
         conn.execute(
             "INSERT INTO transactions(child_id, title, amount, status, note, "
             "created_by, decided_by, decided_at) "
             "VALUES(?,'Auszahlung',?,'approved',?,?,?,datetime('now'))",
-            (child_id, -balance, note, user["id"], user["id"]),
+            (child_id, -transfer, note, user["id"], user["id"]),
         )
         if method == "pocket":
             conn.execute(
                 "INSERT INTO pocket_transactions(child_id, amount, type, note, created_by) "
                 "VALUES(?,?,'payout',?,?)",
-                (child_id, balance, "Auszahlung aus App-Saldo", user["id"]),
+                (child_id, transfer, note, user["id"]),
             )
-            flash(request, "Saldo aufs Taschengeldkonto übertragen. ✅")
+            flash(request, f"{transfer/100:.2f} € aufs Taschengeldkonto übertragen. ✅")
         else:
-            flash(request, "Banküberweisung notiert – Saldo auf 0 zurückgesetzt. ✅")
+            flash(request, "Banküberweisung notiert – Saldo zurückgesetzt. ✅")
     return RedirectResponse("/admin", status_code=303)
 
 

@@ -185,12 +185,14 @@
   </div>
 
   <div id="pocket-sec-{{ k.row.id }}" class="payout-sec" hidden>
-    <p style="font-size:14px;color:var(--muted);margin:0;">
-      {{ k.balance|euro }} werden auf das Taschengeldkonto von <strong>{{ k.row.name }}</strong>
-      gebucht. App-Saldo → 0.
-    </p>
-    <p style="font-size:13px;color:var(--muted);margin:6px 0 0;">
-      TG-Konto jetzt: {{ k.pocket|euro }} → {{ (k.pocket + k.balance)|euro }}
+    <div class="copy-row">
+      <span class="copy-label">Betrag</span>
+      <input class="copy-input" type="text" id="pamt-{{ k.row.id }}"
+             value="{{ '%.2f'|format(k.balance/100)|replace('.',',') }}"
+             oninput="_updatePocketPreview({{ k.row.id }}, {{ k.pocket }}, {{ k.balance }})">
+    </div>
+    <p id="pocket-preview-{{ k.row.id }}" style="font-size:13px;color:var(--muted);margin:6px 0 0;">
+      TG-Konto: {{ k.pocket|euro }} → {{ (k.pocket + k.balance)|euro }}
     </p>
   </div>
 
@@ -199,9 +201,10 @@
     <input type="hidden" name="method" id="method-{{ k.row.id }}" value="bank">
     <input type="hidden" name="iban" id="iban-h-{{ k.row.id }}">
     <input type="hidden" name="verwendungszweck" id="zweck-h-{{ k.row.id }}">
+    <input type="hidden" name="pocket_amount" id="pamt-h-{{ k.row.id }}">
     <div class="dialog-btns">
       <button type="submit" class="btn-ok"
-        onclick="preparePayoutSubmit({{ k.row.id }})">✅ Bestätigen – Saldo auf 0</button>
+        onclick="preparePayoutSubmit({{ k.row.id }})">✅ Bestätigen</button>
       <button type="button" class="btn-no"
         onclick="document.getElementById('payout-modal-{{ k.row.id }}').close()">Abbrechen</button>
     </div>
@@ -295,8 +298,22 @@ function copyEl(elId) {
 function preparePayoutSubmit(id) {
   const iban = document.getElementById('iban-' + id);
   const zweck = document.getElementById('zweck-' + id);
+  const pamt = document.getElementById('pamt-' + id);
   if (iban) document.getElementById('iban-h-' + id).value = iban.value;
   if (zweck) document.getElementById('zweck-h-' + id).value = zweck.value;
+  if (pamt) document.getElementById('pamt-h-' + id).value = pamt.value;
+}
+function _fmtEuro(cents) {
+  return (cents / 100).toLocaleString('de-DE', { style: 'currency', currency: 'EUR' });
+}
+function _updatePocketPreview(id, currentPocket, maxBalance) {
+  const el = document.getElementById('pamt-' + id);
+  const preview = document.getElementById('pocket-preview-' + id);
+  if (!el || !preview) return;
+  const val = parseFloat(el.value.replace(',', '.')) || 0;
+  const cents = Math.round(val * 100);
+  const clamped = Math.max(0, Math.min(cents, maxBalance));
+  preview.textContent = 'TG-Konto: ' + _fmtEuro(currentPocket) + ' → ' + _fmtEuro(currentPocket + clamped);
 }
 function showCopied() {
   const t = document.createElement('div');

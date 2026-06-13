@@ -592,3 +592,79 @@ body.role-child .rule-card:active { transform: scale(.97); }
 /* Dialog-Buttons */
 .dialog-btns { display: flex; flex-direction: column; gap: 8px; margin-top: 14px; }
 .dialog-btns button { width: 100%; padding: 13px; }
+
+/* ====================================================================== */
+/* Taschengeldkonto-Sektion (Kinderdashboard)                              */
+/* ====================================================================== */
+
+.pocket-section {
+  background: linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%);
+  border: 1.5px solid #ddd6fe;
+  border-radius: 18px;
+  padding: 18px 20px;
+  margin: 20px 0;
+}
+.pocket-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+.pocket-section-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: #7c3aed;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  margin-bottom: 2px;
+}
+.pocket-section-balance {
+  font-size: 32px;
+  font-weight: 800;
+  color: #5b21b6;
+}
+.pocket-section-balance.neg { color: var(--minus); }
+
+.pocket-ledger {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border-top: 1px solid #ddd6fe;
+  padding-top: 12px;
+}
+.pocket-ledger-row {
+  display: grid;
+  grid-template-columns: 24px 1fr auto auto;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+.pl-icon { font-size: 15px; }
+.pl-note { color: var(--ink); }
+.pl-date { color: var(--muted); font-size: 11px; white-space: nowrap; }
+.pl-amount { font-weight: 700; white-space: nowrap; }
+
+/* ====================================================================== */
+/* Auszahlungs-Celebration im Ledger                                       */
+/* ====================================================================== */
+
+.ledger-row.payout-row {
+  background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+  border: 1.5px solid #86efac;
+  border-radius: 14px;
+  padding: 12px 14px;
+}
+.payout-title {
+  font-weight: 700;
+  font-size: 15px;
+  color: #15803d;
+}
+.payout-note {
+  font-size: 11px;
+  color: #4ade80;
+}
+.payout-celebrate {
+  font-size: 18px;
+  font-weight: 800;
+  color: #15803d;
+}

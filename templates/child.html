@@ -80,10 +80,36 @@
 <div class="chips">
   <div class="chip {{ week_trend }}">Diese Woche {{ '+' if week >= 0 else '' }}{{ week|euro }}</div>
   <div class="chip xp">⚡ {{ level.xp|euro }} verdient</div>
-  {% if pocket %}<div class="chip pocket-chip">💰 TG-Konto: {{ pocket|euro }}</div>{% endif %}
   {% if user.cash_legacy %}<div class="chip">💵 Bargeld-Altbestand: {{ user.cash_legacy|euro }}</div>{% endif %}
   {% if pending %}<div class="chip wait">⏳ {{ pending }} wartet auf Bestätigung</div>{% endif %}
 </div>
+
+{% if pocket or pocket_txs %}
+<section class="pocket-section">
+  <div class="pocket-section-head">
+    <div>
+      <div class="pocket-section-label">💰 Taschengeldkonto</div>
+      <div class="pocket-section-balance {{ 'neg' if pocket < 0 else '' }}">{{ pocket|euro }}</div>
+    </div>
+  </div>
+  {% if pocket_txs %}
+  <div class="pocket-ledger">
+    {% for pt in pocket_txs %}
+    <div class="pocket-ledger-row">
+      <span class="pl-icon">
+        {% if pt.type == 'withdrawal' %}⬇️
+        {% elif pt.type == 'payout' %}💳
+        {% else %}⬆️{% endif %}
+      </span>
+      <span class="pl-note">{{ pt.note or pt.type }}</span>
+      <span class="pl-date">{{ pt.created_at[:10] }}</span>
+      <span class="pl-amount {{ 'plus' if pt.amount > 0 else 'minus' }}">{{ pt.amount|euro }}</span>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+</section>
+{% endif %}
 
 {% if siblings %}
 <h2>🏅 Wer ist gerade vorne?</h2>
@@ -233,14 +259,24 @@
 <h2>Letzte Buchungen</h2>
 <div class="ledger">
   {% for t in recent %}
-    <div class="ledger-row status-{{ t.status }}">
+    {% set is_payout = t.title == 'Auszahlung' and t.amount < 0 and t.status == 'approved' %}
+    <div class="ledger-row {{ 'payout-row' if is_payout else 'status-' + t.status }}">
       <div class="l-main">
-        <span class="l-title">{{ t.title }}{% if t.evidence_id %} <a class="l-photo" href="/evidence/{{ t.evidence_id }}">📷</a>{% endif %}</span>
-        <span class="l-status">
-          {% if t.status == 'pending' %}⏳ wartet{% elif t.status == 'approved' %}✅ bestätigt{% else %}❌ abgelehnt{% endif %}
-        </span>
+        {% if is_payout %}
+          <span class="l-title payout-title">🎉 Ausgezahlt!</span>
+          <span class="l-status payout-note">{{ t.note }}</span>
+        {% else %}
+          <span class="l-title">{{ t.title }}{% if t.evidence_id %} <a class="l-photo" href="/evidence/{{ t.evidence_id }}">📷</a>{% endif %}</span>
+          <span class="l-status">
+            {% if t.status == 'pending' %}⏳ wartet{% elif t.status == 'approved' %}✅ bestätigt{% else %}❌ abgelehnt{% endif %}
+          </span>
+        {% endif %}
       </div>
-      <div class="l-amount {{ 'plus' if t.amount >= 0 else 'minus' }}">{{ t.amount|euro }}</div>
+      {% if is_payout %}
+        <div class="l-amount payout-celebrate">+{{ (-t.amount)|euro }}</div>
+      {% else %}
+        <div class="l-amount {{ 'plus' if t.amount >= 0 else 'minus' }}">{{ t.amount|euro }}</div>
+      {% endif %}
     </div>
   {% else %}
     <p class="empty">Noch keine Buchungen.</p>
