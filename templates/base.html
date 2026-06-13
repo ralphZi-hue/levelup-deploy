@@ -37,6 +37,22 @@
   </main>
 
   <script>
+    // Passwort-Manager (1Password/LastPass) von allen Nicht-Login-Feldern fernhalten –
+    // ihr Autofill-Overlay blockiert sonst normale Textfelder (Buchungen, Vokabeln, Test).
+    (function () {
+      function tame() {
+        document.querySelectorAll('input, textarea').forEach(function (el) {
+          if (el.type === 'hidden' || el.hasAttribute('data-allow-pw')) return;
+          el.setAttribute('autocomplete', 'off');
+          el.setAttribute('data-1p-ignore', 'true');
+          el.setAttribute('data-lpignore', 'true');
+          el.setAttribute('data-bwignore', 'true');
+          el.setAttribute('data-form-type', 'other');
+        });
+      }
+      if (document.readyState !== 'loading') tame();
+      else document.addEventListener('DOMContentLoaded', tame);
+    })();
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => navigator.serviceWorker.register('/static/sw.js'));
     }
