@@ -56,6 +56,42 @@ def pop_flash(request: Request):
     return request.session.pop("flash", None)
 
 
+def _f(v: str):
+    """'12.34' -> float, '' -> None (defensiv gegen leere Formularfelder)."""
+    try:
+        return float(v) if v not in (None, "") else None
+    except (TypeError, ValueError):
+        return None
+
+
+def attach_evidence(
+    conn: sqlite3.Connection, tx_id: int, uploaded_by: int, photo: Optional[UploadFile],
+    lat: str = "", lon: str = "", accuracy: str = "", client_time: str = "",
+) -> bool:
+    """Speichert ein Beweisfoto (falls vorhanden) und verknüpft es mit der Buchung.
+
+    Der Server setzt die maßgebliche Zeit selbst (server_time, DEFAULT in der DB);
+    Geräte-Zeit und Geräte-Geo werden zusätzlich, aber als 'nur Hinweis' gespeichert.
+    """
+    if not photo or not photo.filename:
+        return False
+    raw = photo.file.read()
+    meta = ev.save_upload(raw, photo.content_type or "")
+    exif = ev.read_exif(raw)
+    conn.execute(
+        "INSERT INTO evidence(tx_id, filename, mime, size, gps_lat, gps_lon, gps_accuracy, "
+        "exif_lat, exif_lon, exif_time, client_time, uploaded_by) "
+        "VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
+        (
+            tx_id, meta["filename"], meta["mime"], meta["size"],
+            _f(lat), _f(lon), _f(accuracy),
+            exif.get("exif_lat"), exif.get("exif_lon"), exif.get("exif_time"),
+            client_time.strip() or None, uploaded_by,
+        ),
+    )
+    return True
+
+
 @app.on_event("startup")
 def _startup() -> None:
     init_db()
@@ -115,7 +151,8 @@ def child_dashboard(request: Request):
             return RedirectResponse("/", status_code=303)
         balance = child_balance(conn, user["id"])
         recent = conn.execute(
-            "SELECT * FROM transactions WHERE child_id = ? ORDER BY id DESC LIMIT 15",
+            "SELECT t.*, (SELECT e.id FROM evidence e WHERE e.tx_id = t.id LIMIT 1) AS evidence_id "
+            "FROM transactions t WHERE t.child_id = ? ORDER BY t.id DESC LIMIT 15",
             (user["id"],),
         ).fetchall()
         pending = conn.execute(
@@ -136,8 +173,34 @@ def child_dashboard(request: Request):
     )
 
 
+@app.get("/claim/new", response_class=HTMLResponse)
+def claim_new(request: Request, rule_id: int):
+    with db() as conn:
+        user = current_user(request, conn)
+        if not user or user["role"] != "child":
+            return RedirectResponse("/", status_code=303)
+        rule = conn.execute(
+            "SELECT * FROM rules WHERE id = ? AND active = 1", (rule_id,)
+        ).fetchone()
+    if not rule:
+        flash(request, "Regel nicht gefunden.", "err")
+        return RedirectResponse("/me", status_code=303)
+    return templates.TemplateResponse(
+        "claim_new.html", {"request": request, "user": user, "rule": rule}
+    )
+
+
 @app.post("/claim")
-def submit_claim(request: Request, rule_id: int = Form(...), note: str = Form("")):
+def submit_claim(
+    request: Request,
+    rule_id: int = Form(...),
+    note: str = Form(""),
+    photo: Optional[UploadFile] = File(None),
+    lat: str = Form(""),
+    lon: str = Form(""),
+    accuracy: str = Form(""),
+    client_time: str = Form(""),
+):
     with db() as conn:
         user = current_user(request, conn)
         if not user or user["role"] != "child":
@@ -148,11 +211,20 @@ def submit_claim(request: Request, rule_id: int = Form(...), note: str = Form(""
         if not rule:
             flash(request, "Regel nicht gefunden.", "err")
             return RedirectResponse("/me", status_code=303)
-        conn.execute(
+        has_photo = bool(photo and photo.filename)
+        if rule["requires_proof"] and not has_photo:
+            flash(request, "Für diese Aufgabe ist ein Beweisfoto nötig. 📷", "err")
+            return RedirectResponse(f"/claim/new?rule_id={rule_id}", status_code=303)
+        cur = conn.execute(
             "INSERT INTO transactions(child_id, rule_id, title, amount, status, note, created_by) "
             "VALUES(?,?,?,?,'pending',?,?)",
             (user["id"], rule["id"], rule["title"], rule["amount"], note.strip(), user["id"]),
         )
+        try:
+            attach_evidence(conn, cur.lastrowid, user["id"], photo, lat, lon, accuracy, client_time)
+        except ev.UploadError as e:
+            flash(request, f"Foto-Problem: {e}", "err")
+            return RedirectResponse(f"/claim/new?rule_id={rule_id}", status_code=303)
     flash(request, "Antrag gestellt – wartet auf Bestätigung durch Mama/Papa. ✅")
     return RedirectResponse("/me", status_code=303)
 
@@ -174,8 +246,9 @@ def admin_dashboard(request: Request):
         for c in children:
             kids.append({"row": c, "balance": child_balance(conn, c["id"])})
         pending = conn.execute(
-            "SELECT t.*, u.name AS child_name FROM transactions t "
-            "JOIN users u ON u.id = t.child_id "
+            "SELECT t.*, u.name AS child_name, "
+            "(SELECT e.id FROM evidence e WHERE e.tx_id = t.id LIMIT 1) AS evidence_id "
+            "FROM transactions t JOIN users u ON u.id = t.child_id "
             "WHERE t.status = 'pending' ORDER BY t.id ASC"
         ).fetchall()
         rules = conn.execute(
@@ -214,6 +287,11 @@ def admin_book(
     custom_title: str = Form(""),
     custom_amount: str = Form(""),
     note: str = Form(""),
+    photo: Optional[UploadFile] = File(None),
+    lat: str = Form(""),
+    lon: str = Form(""),
+    accuracy: str = Form(""),
+    client_time: str = Form(""),
 ):
     """Direktbuchung durch Eltern – sofort gültig (z.B. Vergehen oder Sonderfall)."""
     with db() as conn:
@@ -235,14 +313,74 @@ def admin_book(
         if not title:
             flash(request, "Titel/Regel fehlt.", "err")
             return RedirectResponse("/admin", status_code=303)
-        conn.execute(
+        cur = conn.execute(
             "INSERT INTO transactions(child_id, rule_id, title, amount, status, note, "
             "created_by, decided_by, decided_at) "
             "VALUES(?,?,?,?,'approved',?,?,?, datetime('now'))",
             (child_id, rule_id or None, title, amount, note.strip(), user["id"], user["id"]),
         )
+        try:
+            attach_evidence(conn, cur.lastrowid, user["id"], photo, lat, lon, accuracy, client_time)
+        except ev.UploadError as e:
+            flash(request, f"Buchung gespeichert, aber Foto-Problem: {e}", "err")
+            return RedirectResponse("/admin", status_code=303)
     flash(request, "Buchung erfasst. ✅")
     return RedirectResponse("/admin", status_code=303)
+
+
+# ---------------------------------------------------------------------------
+# Beweisfotos ausliefern (geschützt) + Metadaten
+# ---------------------------------------------------------------------------
+
+def _evidence_if_allowed(request: Request, conn: sqlite3.Connection, ev_id: int):
+    user = current_user(request, conn)
+    if not user:
+        return None, None
+    row = conn.execute(
+        "SELECT e.*, t.child_id FROM evidence e JOIN transactions t ON t.id = e.tx_id "
+        "WHERE e.id = ?",
+        (ev_id,),
+    ).fetchone()
+    if not row:
+        return user, None
+    # Admins dürfen alles; Kinder nur ihre eigenen Beweise
+    if user["role"] != "admin" and user["id"] != row["child_id"]:
+        return user, None
+    return user, row
+
+
+@app.get("/evidence/{ev_id}/image")
+def evidence_image(request: Request, ev_id: int):
+    with db() as conn:
+        user, row = _evidence_if_allowed(request, conn, ev_id)
+    if not user:
+        return RedirectResponse("/login", status_code=303)
+    if not row:
+        return HTMLResponse("Nicht gefunden.", status_code=404)
+    path = ev.path_for(row["filename"])
+    if not os.path.exists(path):
+        return HTMLResponse("Datei fehlt.", status_code=404)
+    return FileResponse(path, media_type=row["mime"] or "application/octet-stream")
+
+
+@app.get("/evidence/{ev_id}", response_class=HTMLResponse)
+def evidence_detail(request: Request, ev_id: int):
+    with db() as conn:
+        user, row = _evidence_if_allowed(request, conn, ev_id)
+        tx = None
+        if row:
+            tx = conn.execute(
+                "SELECT t.*, u.name AS child_name FROM transactions t "
+                "JOIN users u ON u.id = t.child_id WHERE t.id = ?",
+                (row["tx_id"],),
+            ).fetchone()
+    if not user:
+        return RedirectResponse("/login", status_code=303)
+    if not row:
+        return HTMLResponse("Nicht gefunden.", status_code=404)
+    return templates.TemplateResponse(
+        "evidence.html", {"request": request, "user": user, "ev": row, "tx": tx}
+    )
 
 
 @app.get("/admin/rules", response_class=HTMLResponse)

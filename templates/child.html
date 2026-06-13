@@ -20,13 +20,12 @@
     <h3>{{ label }}</h3>
     <div class="rule-grid">
       {% for r in items %}
-        <form method="post" action="/claim" class="rule-card {{ 'plus' if r.amount >= 0 else 'minus' }}">
-          <input type="hidden" name="rule_id" value="{{ r.id }}">
+        <a href="/claim/new?rule_id={{ r.id }}" class="rule-card {{ 'plus' if r.amount >= 0 else 'minus' }}">
           <div class="rule-title">{{ r.title }}</div>
           <div class="rule-amount">{{ r.amount|euro }}</div>
-          {% if r.requires_proof %}<div class="rule-proof">📷 Foto folgt (Phase 2)</div>{% endif %}
-          <button type="submit">Eintragen</button>
-        </form>
+          {% if r.requires_proof %}<div class="rule-proof">📷 Foto nötig</div>{% endif %}
+          <span class="rule-go">Eintragen →</span>
+        </a>
       {% endfor %}
     </div>
   </div>
@@ -38,7 +37,7 @@
   {% for t in recent %}
     <div class="ledger-row status-{{ t.status }}">
       <div class="l-main">
-        <span class="l-title">{{ t.title }}</span>
+        <span class="l-title">{{ t.title }}{% if t.evidence_id %} <a class="l-photo" href="/evidence/{{ t.evidence_id }}">📷</a>{% endif %}</span>
         <span class="l-status">
           {% if t.status == 'pending' %}⏳ wartet{% elif t.status == 'approved' %}✅ bestätigt{% else %}❌ abgelehnt{% endif %}
         </span>
