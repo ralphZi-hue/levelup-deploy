@@ -5,6 +5,7 @@ Start:  uvicorn server:app --reload   (oder ./start_fambank.command)
 from __future__ import annotations
 
 import os
+import secrets
 from typing import Optional
 
 from fastapi import FastAPI, File, Form, Request, UploadFile
@@ -18,8 +19,9 @@ import sqlite3
 import evidence as ev
 import gamify
 import learn
-from auth import authenticate, session_secret
-from db import BASE_DIR, child_balance, db, get_setting, init_db
+import mailer
+from auth import authenticate, hash_password, session_secret
+from db import BASE_DIR, child_balance, db, get_setting, init_db, set_setting
 from seed import seed
 
 app = FastAPI(title="LevelUp")
@@ -516,6 +518,203 @@ def toggle_rule(request: Request, rule_id: int):
             return RedirectResponse("/", status_code=303)
         conn.execute("UPDATE rules SET active = 1 - active WHERE id = ?", (rule_id,))
     return RedirectResponse("/admin/rules", status_code=303)
+
+
+# ---------------------------------------------------------------------------
+# Benutzerverwaltung & Einladungen
+# ---------------------------------------------------------------------------
+
+def _invite_link(request: Request, token: str) -> str:
+    return str(request.base_url).rstrip("/") + f"/register/{token}"
+
+
+@app.get("/admin/users", response_class=HTMLResponse)
+def admin_users(request: Request):
+    with db() as conn:
+        user = current_user(request, conn)
+        if not user or user["role"] != "admin":
+            return RedirectResponse("/", status_code=303)
+        users = conn.execute("SELECT * FROM users ORDER BY role, name").fetchall()
+        invites = conn.execute(
+            "SELECT * FROM invites WHERE used_at IS NULL ORDER BY created_at DESC"
+        ).fetchall()
+        smtp = {
+            "host": get_setting(conn, "smtp_host"),
+            "port": get_setting(conn, "smtp_port", "587"),
+            "user": get_setting(conn, "smtp_user"),
+            "from": get_setting(conn, "smtp_from"),
+            "tls": get_setting(conn, "smtp_tls", "1"),
+            "configured": mailer.smtp_configured(conn),
+        }
+    return templates.TemplateResponse(
+        "admin_users.html",
+        {
+            "request": request, "user": user, "users": users, "invites": invites,
+            "smtp": smtp, "flash": pop_flash(request),
+        },
+    )
+
+
+@app.post("/admin/users/invite")
+def admin_invite(
+    request: Request,
+    name: str = Form(...),
+    username: str = Form(...),
+    email: str = Form(...),
+    role: str = Form(...),
+    base_allowance: str = Form("0"),
+):
+    with db() as conn:
+        user = current_user(request, conn)
+        if not user or user["role"] != "admin":
+            return RedirectResponse("/", status_code=303)
+
+        name, username, email = name.strip(), username.strip().lower(), email.strip()
+        if role not in ("admin", "child"):
+            flash(request, "Ungültige Rolle.", "err")
+            return RedirectResponse("/admin/users", status_code=303)
+        if not name or not username or not email:
+            flash(request, "Name, Benutzername und E-Mail sind Pflicht.", "err")
+            return RedirectResponse("/admin/users", status_code=303)
+        if conn.execute("SELECT 1 FROM users WHERE username = ?", (username,)).fetchone():
+            flash(request, "Benutzername ist bereits vergeben.", "err")
+            return RedirectResponse("/admin/users", status_code=303)
+        if conn.execute(
+            "SELECT 1 FROM invites WHERE username = ? AND used_at IS NULL", (username,)
+        ).fetchone():
+            flash(request, "Für diesen Benutzernamen gibt es bereits eine offene Einladung.", "err")
+            return RedirectResponse("/admin/users", status_code=303)
+        try:
+            base_cents = int(round(float(base_allowance.replace(",", ".")) * 100)) if role == "child" else 0
+        except ValueError:
+            flash(request, "Grund-Taschengeld ungültig.", "err")
+            return RedirectResponse("/admin/users", status_code=303)
+
+        if not mailer.smtp_configured(conn):
+            flash(request, "Bitte zuerst SMTP-Zugangsdaten unten eintragen.", "err")
+            return RedirectResponse("/admin/users", status_code=303)
+
+        token = secrets.token_urlsafe(24)
+        conn.execute(
+            "INSERT INTO invites(token, email, name, username, role, base_allowance, created_by) "
+            "VALUES(?,?,?,?,?,?,?)",
+            (token, email, name, username, role, base_cents, user["id"]),
+        )
+        try:
+            mailer.send_invite_email(conn, email, name, _invite_link(request, token))
+        except mailer.MailError as e:
+            flash(request, f"Einladung gespeichert, aber {e}", "err")
+            return RedirectResponse("/admin/users", status_code=303)
+    flash(request, f"Einladung an {email} verschickt. ✅")
+    return RedirectResponse("/admin/users", status_code=303)
+
+
+@app.post("/admin/users/invite/{invite_id}/resend")
+def admin_invite_resend(request: Request, invite_id: int):
+    with db() as conn:
+        user = current_user(request, conn)
+        if not user or user["role"] != "admin":
+            return RedirectResponse("/", status_code=303)
+        inv = conn.execute(
+            "SELECT * FROM invites WHERE id = ? AND used_at IS NULL", (invite_id,)
+        ).fetchone()
+        if not inv:
+            flash(request, "Einladung nicht gefunden.", "err")
+            return RedirectResponse("/admin/users", status_code=303)
+        try:
+            mailer.send_invite_email(conn, inv["email"], inv["name"], _invite_link(request, inv["token"]))
+        except mailer.MailError as e:
+            flash(request, str(e), "err")
+            return RedirectResponse("/admin/users", status_code=303)
+    flash(request, f"Einladung erneut an {inv['email']} verschickt. ✅")
+    return RedirectResponse("/admin/users", status_code=303)
+
+
+@app.post("/admin/users/invite/{invite_id}/cancel")
+def admin_invite_cancel(request: Request, invite_id: int):
+    with db() as conn:
+        user = current_user(request, conn)
+        if not user or user["role"] != "admin":
+            return RedirectResponse("/", status_code=303)
+        conn.execute("DELETE FROM invites WHERE id = ? AND used_at IS NULL", (invite_id,))
+    flash(request, "Einladung zurückgezogen.")
+    return RedirectResponse("/admin/users", status_code=303)
+
+
+@app.post("/admin/users/smtp")
+def admin_smtp_settings(
+    request: Request,
+    smtp_host: str = Form(""),
+    smtp_port: str = Form("587"),
+    smtp_user: str = Form(""),
+    smtp_pass: str = Form(""),
+    smtp_from: str = Form(""),
+    smtp_tls: str = Form("1"),
+):
+    with db() as conn:
+        user = current_user(request, conn)
+        if not user or user["role"] != "admin":
+            return RedirectResponse("/", status_code=303)
+        set_setting(conn, "smtp_host", smtp_host.strip())
+        set_setting(conn, "smtp_port", smtp_port.strip() or "587")
+        set_setting(conn, "smtp_user", smtp_user.strip())
+        if smtp_pass:
+            set_setting(conn, "smtp_pass", smtp_pass)
+        set_setting(conn, "smtp_from", smtp_from.strip())
+        set_setting(conn, "smtp_tls", "1" if smtp_tls == "1" else "0")
+    flash(request, "SMTP-Einstellungen gespeichert. ✅")
+    return RedirectResponse("/admin/users", status_code=303)
+
+
+# ---------------------------------------------------------------------------
+# Registrierung über Einladungslink
+# ---------------------------------------------------------------------------
+
+@app.get("/register/{token}", response_class=HTMLResponse)
+def register_form(request: Request, token: str):
+    with db() as conn:
+        inv = conn.execute(
+            "SELECT * FROM invites WHERE token = ? AND used_at IS NULL", (token,)
+        ).fetchone()
+    if not inv:
+        flash(request, "Diese Einladung ist ungültig oder wurde bereits verwendet.", "err")
+        return RedirectResponse("/login", status_code=303)
+    return templates.TemplateResponse(
+        "register.html", {"request": request, "invite": inv, "flash": pop_flash(request)}
+    )
+
+
+@app.post("/register/{token}")
+def register_submit(
+    request: Request, token: str,
+    password: str = Form(...), password2: str = Form(...),
+):
+    with db() as conn:
+        inv = conn.execute(
+            "SELECT * FROM invites WHERE token = ? AND used_at IS NULL", (token,)
+        ).fetchone()
+        if not inv:
+            flash(request, "Diese Einladung ist ungültig oder wurde bereits verwendet.", "err")
+            return RedirectResponse("/login", status_code=303)
+        if len(password) < 6:
+            flash(request, "Passwort muss mindestens 6 Zeichen haben.", "err")
+            return RedirectResponse(f"/register/{token}", status_code=303)
+        if password != password2:
+            flash(request, "Passwörter stimmen nicht überein.", "err")
+            return RedirectResponse(f"/register/{token}", status_code=303)
+        if conn.execute("SELECT 1 FROM users WHERE username = ?", (inv["username"],)).fetchone():
+            flash(request, "Dieser Benutzername ist inzwischen vergeben. Bitte Admin kontaktieren.", "err")
+            return RedirectResponse("/login", status_code=303)
+
+        cur = conn.execute(
+            "INSERT INTO users(name, username, role, password_hash, base_allowance, email) "
+            "VALUES(?,?,?,?,?,?)",
+            (inv["name"], inv["username"], inv["role"], hash_password(password),
+             inv["base_allowance"], inv["email"]),
+        )
+        conn.execute("UPDATE invites SET used_at = datetime('now') WHERE id = ?", (inv["id"],))
+        request.session["uid"] = cur.lastrowid
+    return RedirectResponse("/", status_code=303)
 
 
 # ---------------------------------------------------------------------------
