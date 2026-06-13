@@ -180,6 +180,40 @@ CREATE INDEX IF NOT EXISTS idx_invite_token ON invites(token);
 CREATE INDEX IF NOT EXISTS idx_assign_child  ON assignments(child_id);
 CREATE INDEX IF NOT EXISTS idx_assign_status ON assignments(status);
 
+CREATE TABLE IF NOT EXISTS dinner_config (
+    id          INTEGER PRIMARY KEY DEFAULT 1,
+    active      INTEGER NOT NULL DEFAULT 0,
+    dinner_time TEXT,
+    menu        TEXT,
+    date        TEXT
+);
+INSERT OR IGNORE INTO dinner_config(id) VALUES(1);
+
+CREATE TABLE IF NOT EXISTS dinner_slots (
+    slot_key TEXT PRIMARY KEY CHECK (slot_key IN ('decken','abdecken','kueche')),
+    label    TEXT NOT NULL DEFAULT '',
+    sort_ord INTEGER NOT NULL DEFAULT 0,
+    amount   INTEGER NOT NULL DEFAULT 50,
+    mode     TEXT NOT NULL DEFAULT 'plus' CHECK (mode IN ('plus','minus','both')),
+    active   INTEGER NOT NULL DEFAULT 1
+);
+INSERT OR IGNORE INTO dinner_slots(slot_key, label, sort_ord, amount) VALUES
+    ('decken',   'Tisch decken',   1, 50),
+    ('abdecken', 'Tisch abdecken', 2, 50),
+    ('kueche',   'Küche aufräumen',3, 100);
+
+CREATE TABLE IF NOT EXISTS dinner_claims (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    date         TEXT NOT NULL,
+    slot_key     TEXT NOT NULL REFERENCES dinner_slots(slot_key),
+    child_id     INTEGER NOT NULL REFERENCES users(id),
+    committed_at TEXT NOT NULL DEFAULT (datetime('now')),
+    result       TEXT CHECK (result IN ('done','late','missed')),
+    tx_id        INTEGER REFERENCES transactions(id),
+    UNIQUE(date, slot_key)
+);
+CREATE INDEX IF NOT EXISTS idx_dinner_date ON dinner_claims(date);
+
 CREATE TABLE IF NOT EXISTS pocket_transactions (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     child_id    INTEGER NOT NULL REFERENCES users(id),
