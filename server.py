@@ -7,14 +7,15 @@ from __future__ import annotations
 import os
 from typing import Optional
 
-from fastapi import FastAPI, Form, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi import FastAPI, File, Form, Request, UploadFile
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
 
 import sqlite3
 
+import evidence as ev
 from auth import authenticate, session_secret
 from db import BASE_DIR, child_balance, db, get_setting, init_db
 from seed import seed
