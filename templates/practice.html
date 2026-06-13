@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% block title %}Üben · FamBank{% endblock %}
+{% block content %}
+
+<a class="back" href="/learn">← zurück</a>
+<div class="practice-head">
+  <span class="ph-subject">{{ deck.subject|subj_emoji }} {{ deck.subject }}</span>
+  <span class="ph-title">{{ deck.title }}</span>
+</div>
+
+<div class="prog"><div class="prog-fill" id="progFill" style="width:0%"></div></div>
+<div class="prog-meta"><span id="progText">0 / {{ cards|length }}</span></div>
+
+<div id="cardArea">
+  <div class="flashcard" id="flashcard">
+    <div class="fc-side fc-front" id="fcFront"></div>
+    <div class="fc-side fc-back" id="fcBack"></div>
+  </div>
+
+  <button class="reveal-btn" id="revealBtn">Umdrehen 🔄</button>
+  <div class="answer-btns" id="answerBtns" style="display:none">
+    <button class="ans-no" id="ansNo">Wusste ich nicht</button>
+    <button class="ans-yes" id="ansYes">Gewusst ✅</button>
+  </div>
+</div>
+
+<div id="doneArea" class="done-area" style="display:none">
+  <div class="done-emoji">🎉</div>
+  <h2 id="doneTitle">Geschafft!</h2>
+  <p id="doneStats" class="hint"></p>
+  <a class="deck-go" href="/learn">Zurück zur Übersicht →</a>
+</div>
+
+<script id="cardsData" type="application/json">{{ cards|tojson }}</script>
+<script>
+(function(){
+  var cards = JSON.parse(document.getElementById('cardsData').textContent);
+  if(!cards.length){
+    document.getElementById('cardArea').style.display='none';
+    var d=document.getElementById('doneArea'); d.style.display='block';
+    document.getElementById('doneTitle').textContent='Alles geübt! ✅';
+    document.getElementById('doneStats').textContent='Für heute sind keine Karten mehr fällig.';
+    return;
+  }
+  var i=0, right=0, wrong=0;
+  var fc=document.getElementById('flashcard'), front=document.getElementById('fcFront'),
+      back=document.getElementById('fcBack'), revealBtn=document.getElementById('revealBtn'),
+      ansBtns=document.getElementById('answerBtns'), progFill=document.getElementById('progFill'),
+      progText=document.getElementById('progText');
+
+  function show(){
+    var c=cards[i];
+    front.textContent=c.front; back.textContent=c.back;
+    fc.classList.remove('flipped');
+    revealBtn.style.display='block'; ansBtns.style.display='none';
+    progText.textContent=i+' / '+cards.length;
+    progFill.style.width=Math.round(100*i/cards.length)+'%';
+  }
+  function blip(f,d){try{var a=new (window.AudioContext||window.webkitAudioContext)();
+    var o=a.createOscillator(),g=a.createGain();o.frequency.value=f;
+    g.gain.setValueAtTime(0.0001,a.currentTime);g.gain.exponentialRampToValueAtTime(0.2,a.currentTime+0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001,a.currentTime+d);o.connect(g);g.connect(a.destination);
+    o.start();o.stop(a.currentTime+d);}catch(e){}}
+
+  revealBtn.onclick=function(){fc.classList.add('flipped');revealBtn.style.display='none';ansBtns.style.display='flex';};
+
+  function answer(correct){
+    var c=cards[i];
+    var fd=new FormData(); fd.append('correct', correct?'1':'0');
+    fetch('/learn/card/'+c.id+'/answer',{method:'POST',body:fd}).catch(function(){});
+    if(correct){right++; blip(880,0.08);} else {wrong++; blip(300,0.14);}
+    i++;
+    if(i>=cards.length){ finish(); } else { show(); }
+  }
+  document.getElementById('ansYes').onclick=function(){answer(true);};
+  document.getElementById('ansNo').onclick=function(){answer(false);};
+
+  function finish(){
+    progFill.style.width='100%'; progText.textContent=cards.length+' / '+cards.length;
+    document.getElementById('cardArea').style.display='none';
+    var d=document.getElementById('doneArea'); d.style.display='block';
+    document.getElementById('doneStats').textContent='Richtig: '+right+' · Nochmal üben: '+wrong;
+    [523,659,784,1047].forEach(function(f,k){setTimeout(function(){blip(f,0.16);},k*110);});
+  }
+  show();
+})();
+</script>
+{% endblock %}

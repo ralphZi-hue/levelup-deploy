@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}Lernen verwalten · FamBank{% endblock %}
+{% block content %}
+
+<h1>Lernen verwalten</h1>
+<p class="hint">Lege Karteikästen pro Kind und Fach an. Die Kinder üben mit dem Leitner-System.</p>
+
+<section class="panel">
+  <h2>Neuer Karteikasten</h2>
+  <form method="post" action="/admin/learn/deck/add" class="book-form">
+    <label>Für wen
+      <select name="child_id" required>
+        {% for c in children %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}
+      </select>
+    </label>
+    <label>Fach <input name="subject" required placeholder="z.B. Englisch, Mathe, Biologie"></label>
+    <label class="wide">Titel <input name="title" required placeholder="z.B. Unit 5 Vokabeln"></label>
+    <button type="submit">Anlegen</button>
+  </form>
+</section>
+
+<section class="panel">
+  <h2>Alle Karteikästen</h2>
+  {% if decks %}
+    <div class="deck-grid">
+      {% for d in decks %}
+        <div class="deck-card">
+          <div class="deck-subject">{{ d.row.subject|subj_emoji }} {{ d.row.subject }} · {{ d.row.child_name }}</div>
+          <div class="deck-title">{{ d.row.title }}</div>
+          <div class="deck-stats">{{ d.stats.total }} Karten · {{ d.stats.learned }} sitzen</div>
+          <a class="deck-go" href="/admin/learn/deck/{{ d.row.id }}">Karten verwalten →</a>
+        </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <p class="empty">Noch keine Karteikästen.</p>
+  {% endif %}
+</section>
+
+{% endblock %}

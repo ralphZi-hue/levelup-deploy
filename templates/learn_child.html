@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Lernen · FamBank{% endblock %}
+{% block content %}
+
+<h1>📚 Lernen</h1>
+<p class="hint">Übe deine Karteikarten. Was du kannst, kommt seltener dran – was wackelt, öfter. 💪</p>
+
+{% if decks %}
+  <div class="deck-grid">
+    {% for d in decks %}
+      <div class="deck-card">
+        <div class="deck-subject">{{ d.row.subject|subj_emoji }} {{ d.row.subject }}</div>
+        <div class="deck-title">{{ d.row.title }}</div>
+        <div class="deck-stats">
+          <span class="ds-due {{ 'has' if d.stats.due else '' }}">{{ d.stats.due }} fällig</span>
+          <span class="ds-sep">·</span>
+          <span>{{ d.stats.learned }}/{{ d.stats.total }} sitzt 🌟</span>
+        </div>
+        {% if d.stats.due %}
+          <a class="deck-go" href="/learn/{{ d.row.id }}">Jetzt üben →</a>
+        {% else %}
+          <span class="deck-done">Heute alles geübt! ✅</span>
+        {% endif %}
+      </div>
+    {% endfor %}
+  </div>
+{% else %}
+  <div class="panel"><p class="empty">Noch keine Karteikarten. Mama oder Papa legen sie für dich an. 🙂</p></div>
+{% endif %}
+
+{% endblock %}

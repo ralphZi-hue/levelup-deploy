@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}{{ deck.title }} · FamBank{% endblock %}
+{% block content %}
+
+<a class="back" href="/admin/learn">← zurück</a>
+<h1>{{ deck.subject|subj_emoji }} {{ deck.title }}</h1>
+<p class="hint">Fach {{ deck.subject }} · für {{ deck.child_name }} · {{ cards|length }} Karten</p>
+
+<section class="panel">
+  <h2>Karten hinzufügen</h2>
+  <form method="post" action="/admin/learn/deck/{{ deck.id }}/cards/add" class="book-form">
+    <label>Vorderseite (Frage) <input name="front" placeholder="z.B. the house"></label>
+    <label>Rückseite (Antwort) <input name="back" placeholder="z.B. das Haus"></label>
+    <label class="wide">… oder viele auf einmal einfügen
+      <textarea name="bulk" rows="6" placeholder="Eine Karte pro Zeile, getrennt mit  =  oder  -  oder Tab:&#10;the house = das Haus&#10;to run - rennen&#10;7 × 8 = 56"></textarea>
+    </label>
+    <button type="submit">Hinzufügen</button>
+  </form>
+  <p class="hint">Erkannte Trenner: <code>=</code>, <code>-</code>, <code>;</code>, <code>|</code> oder Tab.</p>
+</section>
+
+<section class="panel">
+  <h2>Karten ({{ cards|length }})</h2>
+  {% if cards %}
+    <table class="rules-table">
+      <thead><tr><th>Vorderseite</th><th>Rückseite</th><th>Fach</th><th></th></tr></thead>
+      <tbody>
+        {% for c in cards %}
+          <tr>
+            <td>{{ c.front }}</td>
+            <td>{{ c.back }}</td>
+            <td>📦 {{ c.box }}/5</td>
+            <td>
+              <form method="post" action="/admin/learn/card/{{ c.id }}/delete">
+                <input type="hidden" name="deck_id" value="{{ deck.id }}">
+                <button class="btn-small">Löschen</button>
+              </form>
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p class="empty">Noch keine Karten.</p>
+  {% endif %}
+</section>
+
+<section class="panel danger-zone">
+  <form method="post" action="/admin/learn/deck/{{ deck.id }}/delete"
+        onsubmit="return confirm('Diesen Karteikasten mit allen Karten wirklich löschen?');">
+    <button class="btn-no">Karteikasten löschen</button>
+  </form>
+</section>
+
+{% endblock %}
