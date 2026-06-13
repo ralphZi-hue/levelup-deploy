@@ -10,6 +10,23 @@
       <div class="kid-name">{{ k.row.name }}</div>
       <div class="kid-balance {{ 'neg' if k.balance < 0 else '' }}">{{ k.balance|euro }}</div>
       <div class="kid-sub">voraussichtliche Auszahlung</div>
+      <form method="post" action="/admin/payout" style="margin-top:10px;">
+        <input type="hidden" name="child_id" value="{{ k.row.id }}">
+        <button class="btn btn-small" type="submit"
+          onclick="return confirm('Auszahlung für {{ k.row.name }} erfassen und Saldo auf 0 setzen?');">
+          💸 Auszahlung
+        </button>
+      </form>
+      <details style="margin-top:8px;">
+        <summary class="kid-sub" style="cursor:pointer;">Bargeld-Altbestand: {{ k.row.cash_legacy|euro }}</summary>
+        <form method="post" action="/admin/cash_legacy" style="margin-top:6px;display:flex;gap:6px;">
+          <input type="hidden" name="child_id" value="{{ k.row.id }}">
+          <input type="text" name="amount" placeholder="z.B. 45,00"
+            value="{{ '%.2f'|format(k.row.cash_legacy/100)|replace('.', ',') }}"
+            style="width:90px;" data-1p-ignore data-lpignore="true" data-bwignore autocomplete="off">
+          <button class="btn btn-small" type="submit">Speichern</button>
+        </form>
+      </details>
     </div>
   {% endfor %}
 </div>

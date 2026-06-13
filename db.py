@@ -147,9 +147,22 @@ CREATE INDEX IF NOT EXISTS idx_ta_session ON test_answers(session_id);
 """
 
 
+MIGRATIONS = [
+    # (table, column, ddl)
+    ("users", "cash_legacy", "ALTER TABLE users ADD COLUMN cash_legacy INTEGER NOT NULL DEFAULT 0"),
+]
+
+
 def init_db() -> None:
     with db() as conn:
         conn.executescript(SCHEMA)
+        existing = {}
+        for table, _col, _ddl in MIGRATIONS:
+            if table not in existing:
+                existing[table] = {r["name"] for r in conn.execute(f"PRAGMA table_info({table})")}
+        for table, col, ddl in MIGRATIONS:
+            if col not in existing[table]:
+                conn.execute(ddl)
 
 
 # ---------------------------------------------------------------------------

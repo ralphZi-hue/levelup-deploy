@@ -375,6 +375,44 @@ def admin_book(
     return RedirectResponse("/admin", status_code=303)
 
 
+@app.post("/admin/payout")
+def admin_payout(request: Request, child_id: int = Form(...)):
+    """Auszahlung/Überweisung erfasst – Saldo wird auf 0 zurückgesetzt."""
+    with db() as conn:
+        user = current_user(request, conn)
+        if not user or user["role"] != "admin":
+            return RedirectResponse("/", status_code=303)
+        balance = child_balance(conn, child_id)
+        if balance == 0:
+            flash(request, "Saldo ist bereits 0.")
+            return RedirectResponse("/admin", status_code=303)
+        conn.execute(
+            "INSERT INTO transactions(child_id, title, amount, status, note, "
+            "created_by, decided_by, decided_at) "
+            "VALUES(?,'Auszahlung',?, 'approved', 'Saldo ausgezahlt/überwiesen', ?, ?, datetime('now'))",
+            (child_id, -balance, user["id"], user["id"]),
+        )
+    flash(request, "Auszahlung erfasst – Saldo auf 0 zurückgesetzt. ✅")
+    return RedirectResponse("/admin", status_code=303)
+
+
+@app.post("/admin/cash_legacy")
+def admin_cash_legacy(request: Request, child_id: int = Form(...), amount: str = Form(...)):
+    """Bargeld-Altbestand (z.B. Vincents bisheriges Taschengeld) setzen/ändern."""
+    with db() as conn:
+        user = current_user(request, conn)
+        if not user or user["role"] != "admin":
+            return RedirectResponse("/", status_code=303)
+        try:
+            cents = int(round(float(amount.replace(",", ".")) * 100))
+        except ValueError:
+            flash(request, "Betrag ungültig.", "err")
+            return RedirectResponse("/admin", status_code=303)
+        conn.execute("UPDATE users SET cash_legacy = ? WHERE id = ?", (cents, child_id))
+    flash(request, "Bargeld-Altbestand aktualisiert. ✅")
+    return RedirectResponse("/admin", status_code=303)
+
+
 # ---------------------------------------------------------------------------
 # Beweisfotos ausliefern (geschützt) + Metadaten
 # ---------------------------------------------------------------------------

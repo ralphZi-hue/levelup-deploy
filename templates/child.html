@@ -27,6 +27,7 @@
 <div class="chips">
   <div class="chip {{ week_trend }}">Diese Woche {{ '+' if week >= 0 else '' }}{{ week|euro }}</div>
   <div class="chip xp">⚡ {{ level.xp|euro }} verdient</div>
+  {% if user.cash_legacy %}<div class="chip">💰 Bargeld-Altbestand: {{ user.cash_legacy|euro }}</div>{% endif %}
   {% if pending %}<div class="chip wait">⏳ {{ pending }} wartet auf Bestätigung</div>{% endif %}
 </div>
 

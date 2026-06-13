@@ -37,30 +37,46 @@ Dann im Browser: <http://localhost:8770>
 - **Phase 3b:** Verifizierter Test (Eltern schalten frei, Prüfungsmodus) → Gutschrift bei Bestehen ✅
 - **Phase 4 (nächste):** Auszahlungs-Zyklen, Passwort-Self-Service, Hosting (Domain + HTTPS)
 
-### Phase 4 – Detailplanung (Stand 2026-06-13, noch offen)
+### Phase 4 – Detailplanung (Stand 2026-06-13)
 
-**4.1 Lunch Money pro Woche**
-- Neues Feld pro Kind: wöchentlicher Zusatzbetrag, automatisch gutgeschrieben (eigene Transaktion,
-  sichtbar im Verlauf – nicht einfach in base_allowance integriert)
-- Offen: Betrag pro Kind individuell (Admin setzt im UI)
+**4.1 Lunch Money pro Schultag**
+- Neue Einstellung pro Kind: fester Betrag pro Schultag (Mo–Fr), automatisch gutgeschrieben als
+  eigene, sichtbare Transaktion ("Lunch Money") – nicht in base_allowance integriert
+- Nur an Schultagen: **Berliner Schulferienkalender** wird hinterlegt, an Ferientagen + Wochenende
+  entfällt die Gutschrift
+- Default-Werte (änderbar im Admin-UI): Julian 4 € + freitags zusätzlich 8 € (Gitarrenunterricht,
+  eigene Buchung "Gitarrenunterricht"), Vincent 4 €. Alle Beträge frei pro Kind & Wochentag editierbar.
 
 **4.2 Belege/Auslagen einreichen**
 - Kind reicht Foto + freien Betrag + Notiz ein ("Beleg einreichen", eigener Bereich im Dashboard,
   nicht über die feste Regel-Liste)
 - Landet als pending Transaktion (Kategorie "Auslagen") im Admin-Bereich mit Foto zur Prüfung
-- Bei Genehmigung: Gutschrift, Beleg als "erledigt" markiert
-- Offen: Können Eltern den Betrag vor Genehmigung noch anpassen (z.B. Trinkgeld nicht erstattet)?
+- Eltern können den eingereichten Betrag vor der Genehmigung anpassen (z.B. Trinkgeld nicht erstattet)
+- Bei Genehmigung: Gutschrift (ggf. angepasster Betrag), Beleg als "erledigt" markiert
+
+**4.4 Kontostand-Berichtigung (Auszahlung)**
+- Nach realer Überweisung/Bargeldauszahlung: Admin löst "Auszahlung" aus
+- Erzeugt eine Ausgleichs-Transaktion, die den laufenden Saldo auf **0 zurücksetzt**
+  (Auszahlung = kompletter aktueller Betrag), neue Abrechnungsperiode beginnt
+- Gilt zunächst für Julian (hat bereits ein Konto)
+
+**4.5 Vincent Bargeld-Altbestand**
+- Vincent hat noch kein Konto-Guthaben in der App, aber ein bestehendes Bargeld-Taschengeld
+- Wird als separate zweite Anzeige "Bargeld-Altbestand" neben seinem App-Saldo dargestellt
+  (nicht in den laufenden Saldo eingerechnet)
+- Startwert wird von Ralph vorgegeben, später im Admin-Bereich frei änderbar/abbuchbar
 
 **4.3 Wissenstest mit Eltern-Live-Bewertung** (ersetzt/erweitert 3b)
-- Fortschrittsbalken im Kind-Dashboard: Beherrschungsgrad pro Karteikasten (Metrik offen –
-  Anteil Fach 4-5 vs. Ø Fach/5), Motivationstexte bei Annäherung an Schwelle
-- Bei Erreichen der Schwelle: Kind kann Test "beantragen" (statt bisher: Eltern schalten frei ohne Antrag)
+- Fortschrittsbalken im Kind-Dashboard: Beherrschungsgrad pro Karteikasten = **Anteil der Karten
+  in Fach 4-5** (Standard-Schwelle 80 %, wie bei Phase 3b), Motivationstexte bei Annäherung an die Schwelle
+- Bei Erreichen der Schwelle: Kind kann den Test "beantragen" (statt bisher: Eltern schalten frei ohne Antrag)
+- Eltern wählen beim Freischalten **Belohnung UND Abzug** (Abzug wird als fester Betrag vorgeschlagen,
+  ist aber änderbar)
 - Begleiteter Test: Kind tippt Antworten (wie bisher), aber KEINE Auto-Korrektur mehr
 - Eltern sehen live (Polling) Frage+Antwort des Kindes parallel und bewerten jede Antwort:
   Falsch / 25% / 50% / 75% / Richtig (nur Eltern-Eingabe)
-- Endergebnis = Ø der Eltern-Bewertungen → bestanden: Gutschrift, nicht bestanden: **Abzug**
-- Offen: Höhe des Abzugs bei Nichtbestehen (symmetrisch zur Belohnung? fester Betrag? pro Test wählbar?)
-- Offen: genaue Mastery-Schwelle/Metrik (s.o.)
+- Endergebnis = Ø der Eltern-Bewertungen → **bestanden ab 90 % (Schulnote 1–2)**: Gutschrift (Belohnung);
+  nicht bestanden: Abzug
 
 ### Lernen (Phase 3a)
 Eltern legen pro Kind & Fach Karteikästen an (`/admin/learn`) und füllen Karten einzeln oder per
