@@ -32,14 +32,20 @@ Dann im Browser: <http://localhost:8770>
 - **Phase 1:** Konto + Regelwerk + Genehmigungs-Workflow + Dashboards ✅
 - **Phase 2:** Foto-Beweise (Live-Kamera, Server-Zeitstempel, Geodaten/EXIF) ✅
 - **Phase 3a:** Leitner-Karteikasten + freies Üben ✅
-- **Phase 3b (nächste):** Verifizierter Test (Eltern-PIN, Prüfungsmodus) → Gutschrift bei Bestehen
-- **Phase 4:** Auszahlungs-Zyklen, Passwort-Self-Service, Hosting (Domain + HTTPS)
+- **Phase 3b:** Verifizierter Test (Eltern schalten frei, Prüfungsmodus) → Gutschrift bei Bestehen ✅
+- **Phase 4 (nächste):** Auszahlungs-Zyklen, Passwort-Self-Service, Hosting (Domain + HTTPS)
 
 ### Lernen (Phase 3a)
 Eltern legen pro Kind & Fach Karteikästen an (`/admin/learn`) und füllen Karten einzeln oder per
 Bulk-Import (Trenner `=`, `-`, `;`, `|`, Tab). Kinder üben unter `/learn` mit dem **Leitner-System**
-(5 Fächer, Abstände 0/1/3/7/14 Tage). Freies Üben gibt **kein** Geld – das kommt erst über den
-eltern-überwachten Test in Phase 3b (Schutz gegen KI-Schummeln).
+(5 Fächer, Abstände 0/1/3/7/14 Tage). Freies Üben gibt **kein** Geld.
+
+### Verifizierter Test (Phase 3b)
+Eltern schalten im Admin-Bereich pro Karteikasten einen Test frei (Belohnung wählbar) – **ohne PIN**,
+die Freischaltung im eigenen Account ist die Berechtigung. 20-Min-Startfenster. Das Kind tippt die
+Antworten im **Prüfungsmodus** mit Countdown ein; die Lösungen liegen **nie im Browser** (Auswertung
+server-seitig in `learn.check_answer`) – Schutz gegen Schummeln per KI oder Quelltext. Ab der
+Trefferquote (Standard 80 %) gibt es automatisch eine Gutschrift, markiert als „✅ verifiziert".
 
 ### Hinweis zu „fälschungssicher" (Phase 2)
 Die **Server-Zeit** eines Beweisfotos ist verlässlich (der Server setzt sie). Geräte-Zeit und
