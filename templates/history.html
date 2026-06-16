@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Alle Buchungen · LevelUp{% endblock %}
+{% block content %}
+
+<a class="back" href="/me">← zurück</a>
+<h2>Alle Buchungen</h2>
+<p class="hint" style="margin-bottom:12px;">{{ total }} Einträge gesamt</p>
+
+<div class="ledger">
+  {% for t in txs %}
+    {% set is_payout = t.title == 'Auszahlung' and t.amount < 0 and t.status == 'approved' %}
+    {% set is_rejected = t.status == 'rejected' %}
+    {% set is_pending = t.status == 'pending' %}
+    <div class="ledger-row {{ 'payout-row' if is_payout else 'status-' + t.status }}">
+      <div class="l-main">
+        {% if is_payout %}
+          <span class="l-title payout-title">🎉 Ausgezahlt!</span>
+          <span class="l-status payout-note">{{ t.note }}</span>
+        {% else %}
+          <span class="l-title">{{ t.title }}{% if t.evidence_id %} <a class="l-photo" href="/evidence/{{ t.evidence_id }}">📷</a>{% endif %}</span>
+          <span class="l-status">
+            {% if is_pending %}<span class="ls-pending">⏳ wartet</span>
+            {% elif t.status == 'approved' %}<span class="ls-ok">✅</span>
+            {% else %}<span class="ls-rejected">😢 abgelehnt</span>{% endif %}
+          </span>
+        {% endif %}
+        <span class="l-date" style="font-size:11px;color:var(--muted);margin-top:2px;">{{ t.created_at[:10] }}</span>
+      </div>
+      {% if is_payout %}
+        <div class="l-amount payout-celebrate">+{{ (-t.amount)|euro }}</div>
+      {% else %}
+        <div class="l-amount {{ 'plus' if t.amount >= 0 else 'minus' }} {{ 'amount-rejected' if is_rejected }}">{{ t.amount|euro }}</div>
+      {% endif %}
+    </div>
+  {% else %}
+    <p class="empty">Noch keine Buchungen.</p>
+  {% endfor %}
+</div>
+
+{% if pages > 1 %}
+<div style="display:flex;gap:8px;justify-content:center;margin-top:16px;flex-wrap:wrap;">
+  {% for p in range(1, pages+1) %}
+    <a href="/me/history?page={{ p }}"
+       style="padding:6px 14px;border-radius:8px;font-size:14px;font-weight:600;text-decoration:none;
+              background:{{ 'var(--brand)' if p == page else 'var(--card)' }};
+              color:{{ '#fff' if p == page else 'var(--fg)' }};">{{ p }}</a>
+  {% endfor %}
+</div>
+{% endif %}
+
+{% endblock %}

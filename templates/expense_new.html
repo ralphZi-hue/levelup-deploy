@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}Auslage einreichen · LevelUp{% endblock %}
+{% block content %}
+
+<a class="back" href="/me">← zurück</a>
+
+<div class="claim-head plus">
+  <div class="claim-title">🧾 Auslage einreichen</div>
+  <div class="claim-amount" style="font-size:14px;">Eltern erstatten nach Prüfung</div>
+</div>
+
+<form method="post" action="/me/expense" enctype="multipart/form-data" data-geo class="claim-form">
+  <input type="hidden" name="lat"><input type="hidden" name="lon">
+  <input type="hidden" name="accuracy"><input type="hidden" name="client_time">
+
+  <label>Betrag <span class="req">(erforderlich)</span>
+    <input type="text" name="amount" placeholder="z.B. 4,50" required
+           inputmode="decimal" autocomplete="off" data-1p-ignore>
+  </label>
+
+  <label>Was war das? <span class="req">(erforderlich)</span>
+    <input type="text" name="note" placeholder="z.B. Schulmaterial, Bus, Snack" required>
+  </label>
+
+  <label>Foto / Kassenbon <span class="opt">(empfohlen)</span>
+    <input type="file" name="photo" accept="image/*" capture="environment" data-preview>
+  </label>
+  <img id="photo-preview" alt="Vorschau" style="display:none">
+
+  <div id="geo-status" class="geo-status"></div>
+
+  <button type="submit">Auslage einreichen</button>
+  <p class="hint">Eltern bestätigen und überweisen den Betrag (oder passen ihn an).</p>
+</form>
+
+<script src="/static/geo.js"></script>
+{% endblock %}
